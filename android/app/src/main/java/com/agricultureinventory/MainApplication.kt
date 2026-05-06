@@ -1,6 +1,7 @@
 package com.agricultureinventory
 
 import android.app.Application
+import android.content.Context
 import com.facebook.react.PackageList
 import com.facebook.react.ReactApplication
 import com.facebook.react.ReactHost
@@ -35,6 +36,12 @@ class MainApplication : Application(), ReactApplication {
 
   override fun onCreate() {
     super.onCreate()
+    // Force RTL before React Native bridge reads I18nUtil preferences
+    getSharedPreferences("com.facebook.react.modules.i18nmanager.I18nUtil", Context.MODE_PRIVATE)
+      .edit()
+      .putBoolean("RCTI18nUtil_forceRTL", true)
+      .putBoolean("RCTI18nUtil_allowRTL", true)
+      .apply()
     SoLoader.init(this, false)
     if (BuildConfig.IS_NEW_ARCHITECTURE_ENABLED) {
       // If you opted-in for the New Architecture, we load the native entry point for this app.

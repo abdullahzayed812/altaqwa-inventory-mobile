@@ -10,6 +10,9 @@ import {
 export const getCustomers = () =>
   client.get<Customer[]>('/customers').then(r => r.data);
 
+export const getCustomerById = (id: number) =>
+  client.get<Customer>(`/customers/${id}`).then(r => r.data);
+
 export const createCustomer = (data: { name: string; phone?: string; address?: string }) =>
   client.post<Customer>('/customers', data).then(r => r.data);
 
@@ -46,6 +49,12 @@ export const assignDriver = (orderId: number, driverId: number) =>
 export const getPayments = () =>
   client.get<Payment[]>('/payments').then(r => r.data);
 
+export const getCustomerPayments = (customerId: number, filters: { startDate?: string; endDate?: string; keyword?: string } = {}) =>
+  client.get<Payment[]>(`/customers/${customerId}/payments`, { params: filters }).then(r => r.data);
+
+export const getCustomerOrders = (customerId: number, filters: { startDate?: string; endDate?: string; keyword?: string } = {}) =>
+  client.get<Order[]>(`/customers/${customerId}/orders`, { params: filters }).then(r => r.data);
+
 export const createPayment = (data: {
   customerId: number;
   amount: number;
@@ -72,8 +81,8 @@ export const createPurchase = (data: {
 export const addSupplierPayment = (supplierId: number, data: { amount: number; note?: string }) =>
   client.post<SupplierPayment>(`/suppliers/${supplierId}/payments`, data).then(r => r.data);
 
-export const getSupplierLedger = (supplierId: number) =>
-  client.get<SupplierLedger[]>(`/suppliers/${supplierId}/ledger`).then(r => r.data);
+export const getSupplierLedger = (supplierId: number, filters: { type?: string; startDate?: string; endDate?: string } = {}) =>
+  client.get<SupplierLedger[]>(`/suppliers/${supplierId}/ledger`, { params: filters }).then(r => r.data);
 
 export const getAllSupplierPayments = () =>
   client.get<SupplierPayment[]>('/suppliers/payments/all').then(r => r.data);

@@ -1,104 +1,258 @@
-import React, { useState, useCallback } from 'react';
-import { View, Text, ScrollView, StyleSheet, Alert, TouchableOpacity, RefreshControl } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
-import { getPayments, getOrders } from '../../api';
-import { Customer, Payment, Order } from '../../types';
-import Card from '../../components/Card';
-import { COLORS, CURRENCY, ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, PAYMENT_METHOD_LABELS } from '../../constants/theme';
+import React, { useState, useCallback, useRef } from "react";
+import { View, Text, ScrollView, StyleSheet, Alert, TouchableOpacity, RefreshControl, TextInput, ActivityIndicator } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useFocusEffect } from "@react-navigation/native";
+import { getCustomerById, getCustomerPayments, getCustomerOrders } from "../../api";
+import { Customer, Payment, Order } from "../../types";
+import Card from "../../components/Card";
+import DateRangePicker, { DateRange, toISO } from "../../components/DateRangePicker";
+import { COLORS, CURRENCY, ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, PAYMENT_METHOD_LABELS } from "../../constants/theme";
+
+type Tab = "payments" | "orders";
+
+const EMPTY_RANGE: DateRange = { startDate: null, endDate: null };
 
 export default function CustomerDetailsScreen({ route, navigation }: any) {
-  const customer: Customer = route.params.customer;
+  const [customer, setCustomer] = useState<Customer>(route.params.customer);
+
+  const [activeTab, setActiveTab] = useState<Tab>("payments");
   const [payments, setPayments] = useState<Payment[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const load = async () => {
+  const [paySearch, setPaySearch] = useState("");
+  const [payRange, setPayRange] = useState<DateRange>(EMPTY_RANGE);
+  const [ordSearch, setOrdSearch] = useState("");
+  const [ordRange, setOrdRange] = useState<DateRange>(EMPTY_RANGE);
+
+  const payTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const ordTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const loadPayments = useCallback(
+    async (keyword: string, range: DateRange) => {
+      try {
+        const data = await getCustomerPayments(customer.id, {
+          keyword: keyword.trim() || undefined,
+          startDate: range.startDate ? toISO(range.startDate) : undefined,
+          endDate: range.endDate ? toISO(range.endDate) : undefined,
+        });
+        setPayments(data);
+      } catch (e: any) {
+        Alert.alert("خطأ", e.message);
+      }
+    },
+    [customer.id],
+  );
+
+  const loadOrders = useCallback(
+    async (keyword: string, range: DateRange) => {
+      try {
+        const data = await getCustomerOrders(customer.id, {
+          keyword: keyword.trim() || undefined,
+          startDate: range.startDate ? toISO(range.startDate) : undefined,
+          endDate: range.endDate ? toISO(range.endDate) : undefined,
+        });
+        setOrders(data);
+      } catch (e: any) {
+        Alert.alert("خطأ", e.message);
+      }
+    },
+    [customer.id],
+  );
+
+  const loadAll = useCallback(async () => {
+    setLoading(true);
+    setPaySearch("");
+    setOrdSearch("");
+    setPayRange(EMPTY_RANGE);
+    setOrdRange(EMPTY_RANGE);
     try {
-      const [allPayments, allOrders] = await Promise.all([getPayments(), getOrders()]);
-      setPayments(allPayments.filter(p => p.customerId === customer.id));
-      setOrders(allOrders.filter(o => o.customerId === customer.id));
+      const [fresh] = await Promise.all([
+        getCustomerById(customer.id),
+        loadPayments("", EMPTY_RANGE),
+        loadOrders("", EMPTY_RANGE),
+      ]);
+      setCustomer(fresh);
     } catch (e: any) {
-      Alert.alert('خطأ', e.message);
+      Alert.alert("خطأ", e.message);
     } finally {
+      setLoading(false);
       setRefreshing(false);
     }
+  }, [customer.id, loadPayments, loadOrders]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadAll();
+    }, [loadAll]),
+  );
+
+  const onPaySearchChange = (text: string) => {
+    setPaySearch(text);
+    if (payTimer.current) clearTimeout(payTimer.current);
+    payTimer.current = setTimeout(() => loadPayments(text, payRange), 400);
   };
 
-  useFocusEffect(useCallback(() => { load(); }, []));
+  const onPayRangeChange = (range: DateRange) => {
+    setPayRange(range);
+    loadPayments(paySearch, range);
+  };
 
-  const fmt = (d: string) => new Date(d).toLocaleDateString('ar-EG');
+  const onOrdSearchChange = (text: string) => {
+    setOrdSearch(text);
+    if (ordTimer.current) clearTimeout(ordTimer.current);
+    ordTimer.current = setTimeout(() => loadOrders(text, ordRange), 400);
+  };
+
+  const onOrdRangeChange = (range: DateRange) => {
+    setOrdRange(range);
+    loadOrders(ordSearch, range);
+  };
+
+  const totalOrders   = orders.reduce((s, o) => s + o.totalAmount, 0);
+  const totalPayments = payments.reduce((s, p) => s + p.amount, 0);
+
+  const fmt = (d: string | Date) => new Date(d).toLocaleDateString("ar-EG");
 
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom']}>
+    <SafeAreaView style={styles.safe} edges={["bottom"]}>
       <ScrollView
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              loadAll();
+            }}
+          />
+        }
       >
         {/* Info Card */}
         <Card>
           <Text style={styles.name}>{customer.name}</Text>
-          {customer.phone && <Row label="الهاتف" value={customer.phone} />}
-          {customer.address && <Row label="العنوان" value={customer.address} />}
+          {customer.phone && <InfoRow label="الهاتف" value={customer.phone} />}
+          {customer.address && <InfoRow label="العنوان" value={customer.address} />}
           <View style={styles.debtRow}>
             <Text style={styles.debtLabel}>المديونية</Text>
             <Text style={[styles.debtValue, { color: customer.totalDebt > 0 ? COLORS.debtRed : COLORS.success }]}>
-              {customer.totalDebt.toLocaleString('ar-EG')} {CURRENCY}
+              {customer.totalDebt.toLocaleString("ar-EG")} {CURRENCY}
             </Text>
           </View>
         </Card>
 
-        {/* Add Payment Button */}
-        <TouchableOpacity
-          style={styles.actionBtn}
-          onPress={() => navigation.navigate('AddPayment', { customer })}
-        >
+        <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate("AddPayment", { customer })}>
           <Text style={styles.actionBtnText}>+ إضافة دفعة</Text>
         </TouchableOpacity>
 
-        {/* Payments */}
-        <Text style={styles.sectionTitle}>المدفوعات ({payments.length})</Text>
-        {payments.map(p => (
-          <Card key={p.id}>
-            <View style={styles.row}>
-              <View>
-                <Text style={styles.amount}>{p.amount.toLocaleString('ar-EG')} {CURRENCY}</Text>
-                <Text style={styles.meta}>{PAYMENT_METHOD_LABELS[p.method]} • {fmt(p.createdAt)}</Text>
-                {p.notes && <Text style={styles.meta}>{p.notes}</Text>}
-              </View>
-              <Text style={styles.checkmark}>✅</Text>
+        {/* Summary strip */}
+        {!loading && (orders.length > 0 || payments.length > 0) && (
+          <View style={styles.summaryStrip}>
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryLabel}>إجمالي الطلبات</Text>
+              <Text style={[styles.summaryValue, { color: COLORS.debtRed }]}>
+                {totalOrders.toLocaleString("ar-EG")} {CURRENCY}
+              </Text>
             </View>
-          </Card>
-        ))}
-        {payments.length === 0 && <Text style={styles.empty}>لا توجد مدفوعات</Text>}
+            <View style={styles.summaryDivider} />
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryLabel}>إجمالي المدفوعات</Text>
+              <Text style={[styles.summaryValue, { color: COLORS.success }]}>
+                {totalPayments.toLocaleString("ar-EG")} {CURRENCY}
+              </Text>
+            </View>
+          </View>
+        )}
 
-        {/* Orders */}
-        <Text style={styles.sectionTitle}>الطلبات ({orders.length})</Text>
-        {orders.map(o => (
-          <Card key={o.id}>
-            <View style={styles.row}>
-              <View>
-                <Text style={styles.orderNum}>{o.orderNumber}</Text>
-                <Text style={styles.amount}>{o.totalAmount.toLocaleString('ar-EG')} {CURRENCY}</Text>
-                <Text style={styles.meta}>{fmt(o.createdAt)}</Text>
-              </View>
-              <View style={[styles.statusBadge, { backgroundColor: ORDER_STATUS_COLORS[o.status] }]}>
-                <Text style={styles.statusText}>{ORDER_STATUS_LABELS[o.status]}</Text>
-              </View>
-            </View>
-          </Card>
-        ))}
-        {orders.length === 0 && <Text style={styles.empty}>لا توجد طلبات</Text>}
+        {/* Tabs */}
+        <View style={styles.tabBar}>
+          <TouchableOpacity style={[styles.tab, activeTab === "payments" && styles.tabActive]} onPress={() => setActiveTab("payments")}>
+            <Text style={[styles.tabText, activeTab === "payments" && styles.tabTextActive]}>
+              المدفوعات {payments.length > 0 ? `(${payments.length})` : ""}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.tab, activeTab === "orders" && styles.tabActive]} onPress={() => setActiveTab("orders")}>
+            <Text style={[styles.tabText, activeTab === "orders" && styles.tabTextActive]}>الطلبات {orders.length > 0 ? `(${orders.length})` : ""}</Text>
+          </TouchableOpacity>
+        </View>
+
+        {loading ? (
+          <ActivityIndicator color={COLORS.primary} style={{ marginTop: 32 }} />
+        ) : activeTab === "payments" ? (
+          <>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="بحث في الملاحظات أو المبلغ..."
+              placeholderTextColor={COLORS.textSecondary}
+              value={paySearch}
+              onChangeText={onPaySearchChange}
+            />
+            <DateRangePicker range={payRange} onChange={onPayRangeChange} onClear={() => onPayRangeChange(EMPTY_RANGE)} />
+            {payments.length === 0 ? (
+              <Text style={styles.empty}>لا توجد مدفوعات</Text>
+            ) : (
+              payments.map((p) => (
+                <Card key={p.id}>
+                  <View style={styles.row}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.amount}>
+                        {p.amount.toLocaleString("ar-EG")} {CURRENCY}
+                      </Text>
+                      <Text style={styles.meta}>
+                        {PAYMENT_METHOD_LABELS[p.method]} • {fmt(p.createdAt)}
+                      </Text>
+                      {p.notes && <Text style={styles.meta}>{p.notes}</Text>}
+                    </View>
+                    <Text style={styles.checkmark}>✅</Text>
+                  </View>
+                </Card>
+              ))
+            )}
+          </>
+        ) : (
+          <>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="بحث برقم الطلب أو المبلغ..."
+              placeholderTextColor={COLORS.textSecondary}
+              value={ordSearch}
+              onChangeText={onOrdSearchChange}
+            />
+            <DateRangePicker range={ordRange} onChange={onOrdRangeChange} onClear={() => onOrdRangeChange(EMPTY_RANGE)} />
+            {orders.length === 0 ? (
+              <Text style={styles.empty}>لا توجد طلبات</Text>
+            ) : (
+              orders.map((o) => (
+                <Card key={o.id}>
+                  <View style={styles.row}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.orderNum}>{o.orderNumber}</Text>
+                      <Text style={styles.amount}>
+                        {o.totalAmount.toLocaleString("ar-EG")} {CURRENCY}
+                      </Text>
+                      <Text style={styles.meta}>{fmt(o.createdAt)}</Text>
+                    </View>
+                    <View style={[styles.statusBadge, { backgroundColor: ORDER_STATUS_COLORS[o.status] }]}>
+                      <Text style={styles.statusText}>{ORDER_STATUS_LABELS[o.status]}</Text>
+                    </View>
+                  </View>
+                </Card>
+              ))
+            )}
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginVertical: 4 }}>
+    <View style={{ flexDirection: "row-reverse", justifyContent: "space-between", marginVertical: 4 }}>
       <Text style={{ color: COLORS.textPrimary }}>{value}</Text>
-      <Text style={{ color: COLORS.textSecondary, marginLeft: 8 }}>{label}</Text>
+      <Text style={{ color: COLORS.textSecondary }}>{label}</Text>
     </View>
   );
 }
@@ -106,19 +260,63 @@ function Row({ label, value }: { label: string; value: string }) {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: COLORS.background },
   content: { padding: 16, paddingBottom: 32 },
-  name: { fontSize: 20, fontWeight: 'bold', color: COLORS.textPrimary, textAlign: 'right', marginBottom: 8 },
-  debtRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: COLORS.border },
+  name: { fontSize: 20, fontWeight: "bold", color: COLORS.textPrimary, marginBottom: 8 },
+  debtRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
   debtLabel: { fontSize: 14, color: COLORS.textSecondary },
-  debtValue: { fontSize: 20, fontWeight: 'bold' },
-  actionBtn: { backgroundColor: COLORS.primary, borderRadius: 10, padding: 14, marginBottom: 16, alignItems: 'center' },
-  actionBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
-  sectionTitle: { fontSize: 17, fontWeight: 'bold', color: COLORS.textPrimary, textAlign: 'right', marginBottom: 8, marginTop: 8 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  amount: { fontSize: 16, fontWeight: 'bold', color: COLORS.textPrimary, textAlign: 'right' },
+  debtValue: { fontSize: 20, fontWeight: "bold" },
+  actionBtn: { backgroundColor: COLORS.primary, borderRadius: 10, padding: 14, marginVertical: 12, alignItems: "center" },
+  actionBtnText: { color: "#fff", fontWeight: "bold", fontSize: 15 },
+  tabBar: {
+    flexDirection: "row",
+    backgroundColor: COLORS.card,
+    borderRadius: 10,
+    padding: 4,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  tab: { flex: 1, paddingVertical: 8, alignItems: "center", borderRadius: 8 },
+  tabActive: { backgroundColor: COLORS.primary },
+  tabText: { fontSize: 14, fontWeight: "600", color: COLORS.textSecondary },
+  tabTextActive: { color: "#fff" },
+  searchInput: {
+    backgroundColor: COLORS.card,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    fontSize: 13,
+    color: COLORS.textPrimary,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginBottom: 10,
+  },
+  row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  amount: { fontSize: 16, fontWeight: "bold", color: COLORS.textPrimary },
   meta: { fontSize: 12, color: COLORS.textSecondary, marginTop: 2 },
-  orderNum: { fontSize: 13, color: COLORS.textSecondary },
+  orderNum: { textAlign: "left", fontSize: 13, color: COLORS.textSecondary },
   checkmark: { fontSize: 24 },
   statusBadge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
-  statusText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
-  empty: { color: COLORS.textSecondary, textAlign: 'center', padding: 16 },
+  statusText: { color: "#fff", fontSize: 12, fontWeight: "bold" },
+  empty: { color: COLORS.textSecondary, textAlign: "center", padding: 24 },
+  summaryStrip: {
+    flexDirection: "row",
+    backgroundColor: COLORS.card,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginBottom: 12,
+    overflow: "hidden",
+  },
+  summaryItem: { flex: 1, padding: 12, alignItems: "center" },
+  summaryDivider: { width: 1, backgroundColor: COLORS.border },
+  summaryLabel: { fontSize: 11, color: COLORS.textSecondary, marginBottom: 4 },
+  summaryValue: { fontSize: 15, fontWeight: "bold" },
 });
