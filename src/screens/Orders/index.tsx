@@ -99,10 +99,20 @@ export default function OrdersScreen({ navigation }: any) {
             {/* Customer + amount */}
             <View style={styles.cardBody}>
               <View style={styles.customerRow}>
-                <Text style={styles.customerIcon}>👤</Text>
-                <Text style={styles.customerName}>{o.customer?.name}</Text>
+                <Text style={styles.customerIcon}>{o.customerType === 'DRIVER' ? '🚚' : '👤'}</Text>
+                <Text style={styles.customerName}>
+                  {o.customerType === 'DRIVER' ? o.assignedDriver?.name || 'سائق غير محدد' : o.customer?.name || 'عميل غير محدد'}
+                </Text>
+                <Text style={styles.customerTypeLabel}>
+                  ({o.customerType === 'DRIVER' ? 'سائق' : 'شركة'})
+                </Text>
               </View>
-              <Text style={styles.total}>{o.totalAmount.toLocaleString("ar-EG")} {CURRENCY}</Text>
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={styles.total}>{o.totalAmount.toLocaleString("ar-EG")} {CURRENCY}</Text>
+                {(o.totalDelivery ?? 0) > 0 && (
+                  <Text style={styles.deliveryTotal}>ناولون: {o.totalDelivery?.toLocaleString("ar-EG")} {CURRENCY}</Text>
+                )}
+              </View>
             </View>
 
             <Text style={styles.date}>{new Date(o.createdAt).toLocaleDateString("ar-EG")}</Text>
@@ -110,7 +120,8 @@ export default function OrdersScreen({ navigation }: any) {
             {/* Items preview */}
             {(o.items ?? []).slice(0, 2).map((item) => (
               <Text key={item.id} style={styles.itemLine}>
-                • {item.product?.name} × {item.quantity}
+                • {item.product?.name} × {item.quantity} طن
+                {(item.deliveryFeePerTon ?? 0) > 0 ? ` (ناولون: ${item.deliveryFeePerTon} ${CURRENCY}/طن)` : ''}
               </Text>
             ))}
             {(o.items?.length ?? 0) > 2 && (
@@ -118,7 +129,7 @@ export default function OrdersScreen({ navigation }: any) {
             )}
 
             {/* Actions */}
-            {(o.status === OrderStatus.PENDING || (o.status !== OrderStatus.CANCELLED && o.status !== OrderStatus.DELIVERED)) && (
+            {(o.status === OrderStatus.PENDING || o.status === OrderStatus.ASSIGNED) && (
               <View style={styles.actions}>
                 {o.status === OrderStatus.PENDING && (
                   <TouchableOpacity
@@ -128,14 +139,12 @@ export default function OrdersScreen({ navigation }: any) {
                     <Text style={styles.actionBtnText}>✓ تم التسليم</Text>
                   </TouchableOpacity>
                 )}
-                {o.status !== OrderStatus.CANCELLED && o.status !== OrderStatus.DELIVERED && (
-                  <TouchableOpacity
-                    style={[styles.actionBtn, { backgroundColor: COLORS.danger + "15", marginRight: 8 }]}
-                    onPress={() => changeStatus(o, OrderStatus.CANCELLED)}
-                  >
-                    <Text style={[styles.actionBtnText, { color: COLORS.danger }]}>إلغاء</Text>
-                  </TouchableOpacity>
-                )}
+                <TouchableOpacity
+                  style={[styles.actionBtn, { backgroundColor: COLORS.danger + "15", marginRight: 8 }]}
+                  onPress={() => changeStatus(o, OrderStatus.CANCELLED)}
+                >
+                  <Text style={[styles.actionBtnText, { color: COLORS.danger }]}>إلغاء</Text>
+                </TouchableOpacity>
               </View>
             )}
           </Card>
@@ -178,7 +187,9 @@ const styles = StyleSheet.create({
   customerRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   customerIcon: { fontSize: 14 },
   customerName: { fontSize: 15, fontWeight: "700", color: COLORS.textPrimary },
+  customerTypeLabel: { fontSize: 12, color: COLORS.textSecondary },
   total: { fontSize: 17, fontWeight: "bold", color: COLORS.primary },
+  deliveryTotal: { fontSize: 12, color: COLORS.textSecondary, marginTop: 2 },
   date: { fontSize: 12, color: COLORS.textSecondary, marginBottom: 8 },
   itemLine: { fontSize: 13, color: COLORS.textSecondary, marginBottom: 2 },
   actions: { flexDirection: "row", marginTop: 12, justifyContent: "flex-end" },

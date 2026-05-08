@@ -24,6 +24,9 @@ export const getProducts = () =>
 export const createProduct = (data: { name: string; price: number; stock: number }) =>
   client.post<Product>('/products', data).then(r => r.data);
 
+export const updateProduct = (id: number, data: { name?: string; price?: number; stock?: number; imagePath?: string }) =>
+  client.put<Product>(`/products/${id}`, data).then(r => r.data);
+
 export const updateStock = (id: number, quantity: number) =>
   client.patch<Product>(`/products/${id}/stock`, { quantity }).then(r => r.data);
 
@@ -33,9 +36,12 @@ export const getOrders = () =>
   client.get<Order[]>('/orders').then(r => r.data);
 
 export const createOrder = (data: {
-  customerId: number;
+  customerType?: 'DRIVER' | 'COMPANY';
+  customerId?: number | null;
+  driverId?: number | null;
   totalAmount: number;
-  items: { productId: number; quantity: number; price: number }[];
+  totalDelivery?: number;
+  items: { productId: number; quantity: number; price: number; deliveryFeePerTon?: number; totalDelivery?: number }[];
 }) => client.post<Order>('/orders', data).then(r => r.data);
 
 export const updateOrderStatus = (id: number, status: OrderStatus) =>
@@ -59,6 +65,7 @@ export const createPayment = (data: {
   customerId: number;
   amount: number;
   method: PaymentMethod;
+  senderName?: string;
   notes?: string;
 }) => client.post<Payment>('/payments', data).then(r => r.data);
 
@@ -78,7 +85,10 @@ export const createPurchase = (data: {
   items: { productId: number; quantity: number; price: number }[];
 }) => client.post<Purchase>('/purchases', data).then(r => r.data);
 
-export const addSupplierPayment = (supplierId: number, data: { amount: number; note?: string }) =>
+export const getPurchaseById = (id: number) =>
+  client.get<Purchase>(`/purchases/${id}`).then(r => r.data);
+
+export const addSupplierPayment = (supplierId: number, data: { amount: number; method: PaymentMethod; senderName?: string; note?: string }) =>
   client.post<SupplierPayment>(`/suppliers/${supplierId}/payments`, data).then(r => r.data);
 
 export const getSupplierLedger = (supplierId: number, filters: { type?: string; startDate?: string; endDate?: string } = {}) =>

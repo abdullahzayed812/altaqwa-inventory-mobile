@@ -1,11 +1,11 @@
 import React from "react";
-import { View, StyleSheet, TouchableOpacity, ViewStyle } from "react-native";
+import { View, StyleSheet, TouchableOpacity, ViewStyle, StyleProp } from "react-native";
 import { COLORS } from "../constants/theme";
 
 interface CardProps {
   children: React.ReactNode;
   onPress?: () => void;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
 }
 
 export default function Card({ children, onPress, style }: CardProps) {

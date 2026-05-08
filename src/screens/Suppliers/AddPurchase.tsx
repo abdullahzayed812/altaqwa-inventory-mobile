@@ -3,7 +3,8 @@ import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert, ScrollView,
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getProducts, createPurchase, addSupplierPayment } from "../../api";
 import { Product, Supplier } from "../../types";
-import { COLORS, CURRENCY } from "../../constants/theme";
+import { COLORS, CURRENCY, PAYMENT_METHOD_LABELS } from "../../constants/theme";
+import { PaymentMethod } from "../../types";
 
 interface PurchaseItem {
   productId: number;
@@ -63,6 +64,8 @@ export default function AddPurchaseScreen({ route, navigation }: any) {
   const isPayment: boolean = route.params.isPayment ?? false;
 
   const [payAmount, setPayAmount] = useState("");
+  const [method, setMethod] = useState<PaymentMethod>(PaymentMethod.CASH);
+  const [senderName, setSenderName] = useState("");
   const [payNote, setPayNote] = useState("");
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -73,10 +76,11 @@ export default function AddPurchaseScreen({ route, navigation }: any) {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    navigation.setOptions({ title: isPayment ? "إضافة دفعة" : "فاتورة شراء" });
     if (!isPayment) {
       getProducts().then(setProducts).catch(console.error);
     }
-  }, [isPayment]);
+  }, [isPayment, navigation]);
 
   const total = items.reduce((s, i) => s + i.quantity * i.price, 0);
 
@@ -115,7 +119,12 @@ export default function AddPurchaseScreen({ route, navigation }: any) {
       }
       setSaving(true);
       try {
-        await addSupplierPayment(supplier.id, { amount: amt, note: payNote.trim() || undefined });
+        await addSupplierPayment(supplier.id, {
+          amount: amt,
+          method,
+          senderName: method === PaymentMethod.BANK_TRANSFER ? senderName.trim() : undefined,
+          note: payNote.trim() || undefined
+        });
         navigation.goBack();
       } catch (e: any) {
         Alert.alert("خطأ", e.message);
@@ -150,6 +159,27 @@ export default function AddPurchaseScreen({ route, navigation }: any) {
           <Text style={styles.supplierName}>المورد: {supplier.name}</Text>
           <Label text="المبلغ *" />
           <Input value={payAmount} onChangeText={setPayAmount} placeholder="0.00" keyboardType="decimal-pad" />
+
+          <Label text="طريقة الدفع" />
+          <View style={styles.methodRow}>
+            {Object.values(PaymentMethod).map(m => (
+              <TouchableOpacity
+                key={m}
+                style={[styles.methodChip, method === m && styles.methodChipSelected]}
+                onPress={() => setMethod(m)}
+              >
+                <Text style={[styles.methodText, method === m && { color: '#fff' }]}>{PAYMENT_METHOD_LABELS[m]}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {method === PaymentMethod.BANK_TRANSFER && (
+            <>
+              <Label text="اسم المحول" />
+              <Input value={senderName} onChangeText={setSenderName} placeholder="اسم الشخص أو الجهة المحولة" />
+            </>
+          )}
+
           <Label text="ملاحظة" />
           <Input value={payNote} onChangeText={setPayNote} placeholder="ملاحظة اختيارية" multiline />
           <TouchableOpacity style={[styles.submitBtn, saving && styles.btnDisabled]} onPress={submit} disabled={saving}>
@@ -301,4 +331,8 @@ const styles = StyleSheet.create({
   submitBtn: { backgroundColor: COLORS.primary, borderRadius: 10, padding: 16, alignItems: "center", marginTop: 8 },
   btnDisabled: { opacity: 0.6 },
   submitBtnText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
+  methodRow: { flexDirection: 'row', gap: 8, marginBottom: 4 },
+  methodChip: { flex: 1, borderRadius: 8, padding: 12, borderWidth: 1, borderColor: COLORS.border, alignItems: 'center' },
+  methodChipSelected: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  methodText: { color: COLORS.textSecondary, fontWeight: '600' },
 });

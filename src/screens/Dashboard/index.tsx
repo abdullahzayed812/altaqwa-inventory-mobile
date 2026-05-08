@@ -58,11 +58,15 @@ export default function DashboardScreen() {
         {/* Stats */}
         <View style={styles.statsRow}>
           <StatCard label="إجمالي المبيعات" value={stats?.totalSales ?? 0} icon="💰" color={COLORS.primary} isCurrency />
-          <StatCard label="إجمالي المديونية" value={stats?.totalDebt ?? 0} icon="📋" color={COLORS.debtRed} isCurrency />
+          <StatCard label="إجمالي مديونية العملاء" value={stats?.totalDebt ?? 0} icon="📋" color={COLORS.debtRed} isCurrency />
         </View>
         <View style={styles.statsRow}>
-          <StatCard label="إجمالي المدفوعات" value={stats?.totalPayments ?? 0} icon="✅" color={COLORS.success} isCurrency />
+          <StatCard label="إجمالي مدفوعات العملاء" value={stats?.totalPayments ?? 0} icon="✅" color={COLORS.success} isCurrency />
           <StatCard label="مخزون منخفض" value={stats?.lowStockCount ?? 0} icon="⚠️" color={COLORS.warning} />
+        </View>
+        <View style={styles.statsRow}>
+          <StatCard label="إجمالي المشتريات" value={stats?.totalPurchases ?? 0} icon="🛒" color={COLORS.primary} isCurrency />
+          <StatCard label="إجمالي دفعات الشركات" value={stats?.totalCompanyPayments ?? 0} icon="🏢" color={COLORS.success} isCurrency />
         </View>
 
         {/* Top Products */}

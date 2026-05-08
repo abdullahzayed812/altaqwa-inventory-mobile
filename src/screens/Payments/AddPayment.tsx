@@ -11,6 +11,7 @@ export default function AddPaymentScreen({ route, navigation }: any) {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(preCustomer ?? null);
   const [amount, setAmount] = useState('');
   const [method, setMethod] = useState<PaymentMethod>(PaymentMethod.CASH);
+  const [senderName, setSenderName] = useState('');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -26,7 +27,7 @@ export default function AddPaymentScreen({ route, navigation }: any) {
     if (!amt || amt <= 0) { Alert.alert('خطأ', 'أدخل مبلغ صحيح'); return; }
     setSaving(true);
     try {
-      await createPayment({ customerId: selectedCustomer.id, amount: amt, method, notes: notes.trim() || undefined });
+      await createPayment({ customerId: selectedCustomer.id, amount: amt, method, senderName: method === PaymentMethod.BANK_TRANSFER ? senderName.trim() : undefined, notes: notes.trim() || undefined });
       navigation.goBack();
     } catch (e: any) {
       Alert.alert('خطأ', e.message);
@@ -84,6 +85,20 @@ export default function AddPaymentScreen({ route, navigation }: any) {
               </TouchableOpacity>
             ))}
           </View>
+
+          {method === PaymentMethod.BANK_TRANSFER && (
+            <>
+              <Text style={styles.label}>اسم المحول</Text>
+              <TextInput
+                style={styles.input}
+                value={senderName}
+                onChangeText={setSenderName}
+                placeholder="اسم الشخص أو الجهة المحولة"
+                placeholderTextColor={COLORS.textSecondary}
+                textAlign="right"
+              />
+            </>
+          )}
 
           <Text style={styles.label}>ملاحظات</Text>
           <TextInput

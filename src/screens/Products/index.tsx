@@ -2,7 +2,7 @@ import React, { useCallback, useState } from "react";
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, TextInput, Alert, Modal, KeyboardAvoidingView, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
-import { getProducts, createProduct } from "../../api";
+import { getProducts, createProduct, updateProduct } from "../../api";
 import { Product } from "../../types";
 import Card from "../../components/Card";
 import LoadingSpinner from "../../components/LoadingSpinner";
@@ -13,6 +13,7 @@ export default function ProductsScreen() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [stock, setStock] = useState("");
@@ -34,6 +35,21 @@ export default function ProductsScreen() {
     }, []),
   );
 
+  const openModal = (product?: Product) => {
+    if (product) {
+      setEditingProduct(product);
+      setName(product.name);
+      setPrice(product.price.toString());
+      setStock(product.stock.toString());
+    } else {
+      setEditingProduct(null);
+      setName("");
+      setPrice("");
+      setStock("");
+    }
+    setModalVisible(true);
+  };
+
   const save = async () => {
     if (!name.trim() || !price || !stock) {
       Alert.alert("خطأ", "جميع الحقول مطلوبة");
@@ -47,7 +63,11 @@ export default function ProductsScreen() {
     }
     setSaving(true);
     try {
-      await createProduct({ name: name.trim(), price: p, stock: s });
+      if (editingProduct) {
+        await updateProduct(editingProduct.id, { name: name.trim(), price: p, stock: s });
+      } else {
+        await createProduct({ name: name.trim(), price: p, stock: s });
+      }
       setModalVisible(false);
       setName("");
       setPrice("");
@@ -80,14 +100,19 @@ export default function ProductsScreen() {
             <Text style={styles.productPrice}>
               {p.price.toLocaleString("ar-EG")} {CURRENCY}
             </Text>
-            <View style={[styles.stockBadge, p.stock < 10 && { backgroundColor: COLORS.warning }]}>
-              <Text style={styles.stockText}>{p.stock} وحدة</Text>
+            <View style={styles.cardFooter}>
+              <View style={[styles.stockBadge, p.stock < 10 && { backgroundColor: COLORS.warning }]}>
+                <Text style={styles.stockText}>{p.stock} وحدة</Text>
+              </View>
+              <TouchableOpacity style={styles.editBtn} onPress={() => openModal(p)}>
+                <Text style={styles.editBtnText}>تعديل</Text>
+              </TouchableOpacity>
             </View>
           </Card>
         )}
       />
 
-      <TouchableOpacity style={styles.fab} onPress={() => setModalVisible(true)}>
+      <TouchableOpacity style={styles.fab} onPress={() => openModal()}>
         <Text style={styles.fabText}>+ منتج</Text>
       </TouchableOpacity>
 
@@ -95,12 +120,12 @@ export default function ProductsScreen() {
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>منتج جديد</Text>
+              <Text style={styles.modalTitle}>{editingProduct ? "تعديل منتج" : "منتج جديد"}</Text>
               <Label text="الاسم *" />
               <Input value={name} onChangeText={setName} placeholder="اسم المنتج" />
               <Label text="السعر *" />
               <Input value={price} onChangeText={setPrice} placeholder="0.00" keyboardType="decimal-pad" />
-              <Label text="المخزون الابتدائي *" />
+              <Label text="المخزون *" />
               <Input value={stock} onChangeText={setStock} placeholder="0" keyboardType="numeric" />
               <View style={styles.modalActions}>
                 <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalVisible(false)}>
@@ -148,8 +173,11 @@ const styles = StyleSheet.create({
   lowStockBadge: { fontSize: 10, color: COLORS.warning, marginBottom: 4 },
   productName: { fontSize: 14, fontWeight: "bold", color: COLORS.textPrimary, marginBottom: 8, minHeight: 36 },
   productPrice: { fontSize: 15, color: COLORS.primary, fontWeight: "bold", marginBottom: 8 },
-  stockBadge: { backgroundColor: COLORS.primary, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, alignSelf: "flex-end" },
+  cardFooter: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  stockBadge: { backgroundColor: COLORS.primary, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
   stockText: { color: "#fff", fontSize: 12, fontWeight: "bold" },
+  editBtn: { backgroundColor: COLORS.background, borderWidth: 1, borderColor: COLORS.border, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+  editBtnText: { color: COLORS.textSecondary, fontSize: 12, fontWeight: "bold" },
   fab: { position: "absolute", bottom: 20, left: 20, backgroundColor: COLORS.primary, borderRadius: 28, paddingHorizontal: 24, paddingVertical: 14 },
   fabText: { color: "#fff", fontWeight: "bold", fontSize: 15 },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },

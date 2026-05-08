@@ -80,9 +80,14 @@ export default function SuppliersScreen({ navigation }: any) {
                 {s.phone && <Text style={styles.sub}>{s.phone}</Text>}
               </View>
               <View style={styles.balanceBox}>
-                {s.totalBalance > 0 ? (
+                {s.totalBalance < 0 ? (
+                  <View style={[styles.balanceBadge, { backgroundColor: COLORS.success + "12" }]}>
+                    <Text style={[styles.balanceValue, { color: COLORS.success }]}>دائن: {Math.abs(s.totalBalance).toLocaleString("ar-EG")}</Text>
+                    <Text style={[styles.balanceCurrency, { color: COLORS.success }]}>{CURRENCY}</Text>
+                  </View>
+                ) : s.totalBalance > 0 ? (
                   <View style={styles.balanceBadge}>
-                    <Text style={styles.balanceValue}>{s.totalBalance.toLocaleString("ar-EG")}</Text>
+                    <Text style={styles.balanceValue}>مدين: {s.totalBalance.toLocaleString("ar-EG")}</Text>
                     <Text style={styles.balanceCurrency}>{CURRENCY}</Text>
                   </View>
                 ) : (

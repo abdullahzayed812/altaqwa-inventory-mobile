@@ -110,7 +110,7 @@ export default function CustomerDetailsScreen({ route, navigation }: any) {
     loadOrders(ordSearch, range);
   };
 
-  const totalOrders   = orders.reduce((s, o) => s + o.totalAmount, 0);
+  const totalOrders = orders.reduce((s, o) => s + o.totalAmount, 0);
   const totalPayments = payments.reduce((s, p) => s + p.amount, 0);
 
   const fmt = (d: string | Date) => new Date(d).toLocaleDateString("ar-EG");
@@ -203,6 +203,7 @@ export default function CustomerDetailsScreen({ route, navigation }: any) {
                       <Text style={styles.meta}>
                         {PAYMENT_METHOD_LABELS[p.method]} • {fmt(p.createdAt)}
                       </Text>
+                      {p.senderName && <Text style={styles.meta}>المحول: {p.senderName}</Text>}
                       {p.notes && <Text style={styles.meta}>{p.notes}</Text>}
                     </View>
                     <Text style={styles.checkmark}>✅</Text>
@@ -225,20 +226,63 @@ export default function CustomerDetailsScreen({ route, navigation }: any) {
               <Text style={styles.empty}>لا توجد طلبات</Text>
             ) : (
               orders.map((o) => (
-                <Card key={o.id}>
-                  <View style={styles.row}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.orderNum}>{o.orderNumber}</Text>
-                      <Text style={styles.amount}>
-                        {o.totalAmount.toLocaleString("ar-EG")} {CURRENCY}
+                <View key={o.id} style={styles.orderCard}>
+                  {/* Header */}
+                  <View style={styles.orderCardHeader}>
+                    <View style={[styles.orderStatusBadge, { backgroundColor: ORDER_STATUS_COLORS[o.status] + "20" }]}>
+                      <View style={[styles.orderStatusDot, { backgroundColor: ORDER_STATUS_COLORS[o.status] }]} />
+                      <Text style={[styles.orderStatusText, { color: ORDER_STATUS_COLORS[o.status] }]}>
+                        {ORDER_STATUS_LABELS[o.status]}
                       </Text>
-                      <Text style={styles.meta}>{fmt(o.createdAt)}</Text>
                     </View>
-                    <View style={[styles.statusBadge, { backgroundColor: ORDER_STATUS_COLORS[o.status] }]}>
-                      <Text style={styles.statusText}>{ORDER_STATUS_LABELS[o.status]}</Text>
+                    <View style={{ alignItems: "flex-end" }}>
+                      <Text style={styles.orderNum}>{o.orderNumber}</Text>
+                      <Text style={styles.orderDate}>{fmt(o.createdAt)}</Text>
                     </View>
                   </View>
-                </Card>
+
+                  {/* Items */}
+                  {(o.items && o.items.length > 0) && (
+                    <View style={styles.orderItemsSection}>
+                      {/* Column headers */}
+                      <View style={styles.orderItemHeaderRow}>
+                        <Text style={[styles.orderItemColHeader, { flex: 2 }]}>المنتج</Text>
+                        <Text style={styles.orderItemColHeader}>الكمية</Text>
+                        <Text style={styles.orderItemColHeader}>السعر</Text>
+                        <Text style={styles.orderItemColHeader}>الناولون</Text>
+                        <Text style={styles.orderItemColHeader}>الإجمالي</Text>
+                      </View>
+                      {o.items.map((item, idx) => (
+                        <View
+                          key={item.id}
+                          style={[styles.orderItemRow, idx % 2 === 1 && styles.orderItemRowAlt]}
+                        >
+                          <Text style={[styles.orderItemCell, { flex: 2, textAlign: "right", fontWeight: "600" }]} numberOfLines={1}>
+                            {item.product?.name ?? "—"}
+                          </Text>
+                          <Text style={styles.orderItemCell}>{item.quantity}</Text>
+                          <Text style={styles.orderItemCell}>{item.price}</Text>
+                          <Text style={styles.orderItemCell}>{item.deliveryFeePerTon ?? 0}</Text>
+                          <Text style={[styles.orderItemCell, { color: COLORS.primary, fontWeight: "700" }]}>
+                            {((item.quantity * item.price) + (item.totalDelivery ?? 0)).toLocaleString("ar-EG")}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Footer totals */}
+                  <View style={styles.orderCardFooter}>
+                    {(o.totalDelivery ?? 0) > 0 && (
+                      <Text style={styles.orderDeliveryText}>
+                        ناولون: {(o.totalDelivery ?? 0).toLocaleString("ar-EG")} {CURRENCY}
+                      </Text>
+                    )}
+                    <Text style={styles.orderTotalText}>
+                      الإجمالي: {o.totalAmount.toLocaleString("ar-EG")} {CURRENCY}
+                    </Text>
+                  </View>
+                </View>
               ))
             )}
           </>
@@ -319,4 +363,61 @@ const styles = StyleSheet.create({
   summaryDivider: { width: 1, backgroundColor: COLORS.border },
   summaryLabel: { fontSize: 11, color: COLORS.textSecondary, marginBottom: 4 },
   summaryValue: { fontSize: 15, fontWeight: "bold" },
+
+  // Order card
+  orderCard: {
+    backgroundColor: COLORS.card,
+    borderRadius: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  orderCardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 12,
+    backgroundColor: COLORS.background,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  orderStatusBadge: {
+    flexDirection: "row", alignItems: "center",
+    borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, gap: 5,
+  },
+  orderStatusDot: { width: 7, height: 7, borderRadius: 4 },
+  orderStatusText: { fontSize: 12, fontWeight: "700" },
+  orderDate: { fontSize: 11, color: COLORS.textSecondary, marginTop: 2, textAlign: "right" },
+  orderItemsSection: { borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  orderItemHeaderRow: {
+    flexDirection: "row",
+    backgroundColor: COLORS.primary + "12",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  orderItemColHeader: {
+    flex: 1, fontSize: 10, fontWeight: "700",
+    color: COLORS.primary, textAlign: "center",
+  },
+  orderItemRow: {
+    flexDirection: "row", paddingHorizontal: 10, paddingVertical: 8,
+  },
+  orderItemRowAlt: { backgroundColor: COLORS.background },
+  orderItemCell: {
+    flex: 1, fontSize: 12, color: COLORS.textPrimary,
+    textAlign: "center",
+  },
+  orderCardFooter: {
+    flexDirection: "row", justifyContent: "space-between",
+    alignItems: "center", padding: 12,
+    backgroundColor: COLORS.primaryDark,
+  },
+  orderDeliveryText: { fontSize: 12, color: "rgba(255,255,255,0.75)" },
+  orderTotalText: { fontSize: 15, fontWeight: "bold", color: "#fff" },
 });

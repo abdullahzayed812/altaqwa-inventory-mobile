@@ -2,8 +2,8 @@ import React, { useCallback, useState } from "react";
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Alert, RefreshControl, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
-import { getSupplierById, getSupplierLedger } from "../../api";
-import { Supplier, SupplierLedger, SupplierLedgerType } from "../../types";
+import { getSupplierById, getSupplierLedger, getPurchaseById } from "../../api";
+import { Purchase, Supplier, SupplierLedger, SupplierLedgerType } from "../../types";
 import Card from "../../components/Card";
 import DateRangePicker, { DateRange, toISO } from "../../components/DateRangePicker";
 import { COLORS, CURRENCY, LEDGER_TYPE_LABELS } from "../../constants/theme";
@@ -28,6 +28,13 @@ export default function SupplierDetailsScreen({ route, navigation }: any) {
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("ALL");
   const [dateRange, setDateRange] = useState<DateRange>(EMPTY_RANGE);
 
+  // Map of purchaseId -> Purchase (cached details)
+  const [purchaseCache, setPurchaseCache] = useState<Record<number, Purchase>>({});
+  // Set of expanded ledger entry ids
+  const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+  // Set of currently loading purchase ids
+  const [loadingPurchaseIds, setLoadingPurchaseIds] = useState<Set<number>>(new Set());
+
   const loadLedger = useCallback(
     async (type: TypeFilter, range: DateRange) => {
       try {
@@ -48,6 +55,7 @@ export default function SupplierDetailsScreen({ route, navigation }: any) {
     setLoading(true);
     setTypeFilter("ALL");
     setDateRange(EMPTY_RANGE);
+    setExpandedIds(new Set());
     try {
       const [sup, led] = await Promise.all([getSupplierById(supplier.id), getSupplierLedger(supplier.id)]);
       setSupplier(sup);
@@ -74,6 +82,37 @@ export default function SupplierDetailsScreen({ route, navigation }: any) {
   const handleRangeChange = (range: DateRange) => {
     setDateRange(range);
     loadLedger(typeFilter, range);
+  };
+
+  const toggleExpand = async (entry: SupplierLedger) => {
+    if (entry.type !== SupplierLedgerType.PURCHASE || !entry.referenceId) return;
+
+    const newSet = new Set(expandedIds);
+    if (newSet.has(entry.id)) {
+      newSet.delete(entry.id);
+      setExpandedIds(newSet);
+      return;
+    }
+
+    newSet.add(entry.id);
+    setExpandedIds(newSet);
+
+    // Fetch purchase details if not cached
+    if (!purchaseCache[entry.referenceId]) {
+      setLoadingPurchaseIds((prev) => new Set(prev).add(entry.referenceId!));
+      try {
+        const purchase = await getPurchaseById(entry.referenceId);
+        setPurchaseCache((prev) => ({ ...prev, [entry.referenceId!]: purchase }));
+      } catch (e: any) {
+        Alert.alert("خطأ", e.message);
+      } finally {
+        setLoadingPurchaseIds((prev) => {
+          const s = new Set(prev);
+          s.delete(entry.referenceId!);
+          return s;
+        });
+      }
+    }
   };
 
   const fmt = (d: string | Date) => new Date(d).toLocaleDateString("ar-EG");
@@ -163,20 +202,75 @@ export default function SupplierDetailsScreen({ route, navigation }: any) {
         ) : (
           ledger.map((entry) => {
             const isPurchase = entry.type === SupplierLedgerType.PURCHASE;
+            const isExpanded = expandedIds.has(entry.id);
+            const cachedPurchase = entry.referenceId ? purchaseCache[entry.referenceId] : null;
+            const isLoadingItems = entry.referenceId ? loadingPurchaseIds.has(entry.referenceId) : false;
+
             return (
               <Card key={entry.id}>
-                <View style={styles.ledgerRow}>
+                {/* Header row — tappable if it's a purchase */}
+                <TouchableOpacity
+                  activeOpacity={isPurchase ? 0.7 : 1}
+                  onPress={() => isPurchase && toggleExpand(entry)}
+                  style={styles.ledgerRow}
+                >
                   <View style={styles.ledgerLeft}>
                     <View style={[styles.typeBadge, { backgroundColor: isPurchase ? COLORS.debtRed + "18" : COLORS.success + "18" }]}>
                       <Text style={[styles.typeBadgeText, { color: isPurchase ? COLORS.debtRed : COLORS.success }]}>{isPurchase ? "شراء" : "دفعة"}</Text>
                     </View>
                     <Text style={styles.ledgerDate}>{fmt(entry.createdAt)}</Text>
                   </View>
-                  <Text style={[styles.ledgerAmount, { color: isPurchase ? COLORS.debtRed : COLORS.success }]}>
-                    {isPurchase ? "+" : "-"}
-                    {entry.amount.toLocaleString("ar-EG")} {CURRENCY}
-                  </Text>
-                </View>
+                  <View style={styles.ledgerRight}>
+                    <Text style={[styles.ledgerAmount, { color: isPurchase ? COLORS.debtRed : COLORS.success }]}>
+                      {isPurchase ? "+" : "-"}
+                      {entry.amount.toLocaleString("ar-EG")} {CURRENCY}
+                    </Text>
+                    {isPurchase && (
+                      <Text style={styles.expandIcon}>{isExpanded ? "▲" : "▼"}</Text>
+                    )}
+                  </View>
+                </TouchableOpacity>
+
+                {/* Expanded purchase items */}
+                {isPurchase && isExpanded && (
+                  <View style={styles.itemsContainer}>
+                    <View style={styles.itemsDivider} />
+                    {isLoadingItems ? (
+                      <ActivityIndicator color={COLORS.primary} style={{ paddingVertical: 10 }} />
+                    ) : cachedPurchase?.items && cachedPurchase.items.length > 0 ? (
+                      <>
+                        {/* Items header */}
+                        <View style={styles.itemsHeader}>
+                          <Text style={[styles.itemsHeaderText, { flex: 2 }]}>المنتج</Text>
+                          <Text style={styles.itemsHeaderText}>الكمية</Text>
+                          <Text style={styles.itemsHeaderText}>السعر</Text>
+                          <Text style={styles.itemsHeaderText}>الإجمالي</Text>
+                        </View>
+                        {cachedPurchase.items.map((item) => (
+                          <View key={item.id} style={styles.itemRow}>
+                            <Text style={[styles.itemName, { flex: 2 }]} numberOfLines={1}>
+                              {item.product?.name ?? `منتج #${item.productId}`}
+                            </Text>
+                            <Text style={styles.itemCell}>{item.quantity.toLocaleString("ar-EG")}</Text>
+                            <Text style={styles.itemCell}>{item.price.toLocaleString("ar-EG")}</Text>
+                            <Text style={[styles.itemCell, { color: COLORS.primary, fontWeight: "700" }]}>
+                              {(item.quantity * item.price).toLocaleString("ar-EG")}
+                            </Text>
+                          </View>
+                        ))}
+                        {/* Total row */}
+                        <View style={styles.itemsTotalRow}>
+                          <Text style={styles.itemsTotalLabel}>الإجمالي</Text>
+                          <Text style={styles.itemsTotalValue}>
+                            {entry.amount.toLocaleString("ar-EG")} {CURRENCY}
+                          </Text>
+                        </View>
+                      </>
+                    ) : (
+                      <Text style={styles.noItems}>لا توجد تفاصيل</Text>
+                    )}
+                  </View>
+                )}
               </Card>
             );
           })
@@ -241,9 +335,28 @@ const styles = StyleSheet.create({
   summaryValue: { fontSize: 15, fontWeight: "bold" },
   ledgerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   ledgerLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
+  ledgerRight: { flexDirection: "row", alignItems: "center", gap: 8 },
   typeBadge: { borderRadius: 6, paddingHorizontal: 10, paddingVertical: 3 },
   typeBadgeText: { fontSize: 13, fontWeight: "700" },
   ledgerDate: { fontSize: 12, color: COLORS.textSecondary },
   ledgerAmount: { fontSize: 16, fontWeight: "bold" },
+  expandIcon: { fontSize: 10, color: COLORS.textSecondary },
+  // Items expanded area
+  itemsContainer: { marginTop: 10 },
+  itemsDivider: { height: 1, backgroundColor: COLORS.border, marginBottom: 10 },
+  itemsHeader: { flexDirection: "row", marginBottom: 6 },
+  itemsHeaderText: { flex: 1, fontSize: 11, color: COLORS.textSecondary, fontWeight: "700", textAlign: "center" },
+  itemRow: { flexDirection: "row", alignItems: "center", paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: COLORS.border + "55" },
+  itemName: { fontSize: 13, color: COLORS.textPrimary, textAlign: "right", paddingRight: 4 },
+  itemCell: { flex: 1, fontSize: 13, color: COLORS.textPrimary, textAlign: "center" },
+  itemsTotalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingTop: 10,
+    marginTop: 4,
+  },
+  itemsTotalLabel: { fontSize: 13, fontWeight: "700", color: COLORS.textPrimary },
+  itemsTotalValue: { fontSize: 13, fontWeight: "700", color: COLORS.debtRed },
+  noItems: { fontSize: 12, color: COLORS.textSecondary, textAlign: "center", paddingVertical: 8 },
   empty: { color: COLORS.textSecondary, textAlign: "center", padding: 24 },
 });

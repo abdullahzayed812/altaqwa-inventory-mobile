@@ -23,6 +23,7 @@ import AddPaymentScreen from "../screens/Payments/AddPayment";
 import DriversScreen from "../screens/Drivers";
 import ReportsScreen from "../screens/Reports";
 import IPConfigScreen from "../screens/Landing/IPConfigScreen";
+import SplashScreen from "../screens/Landing/SplashScreen";
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -155,7 +156,8 @@ function MainTabs() {
 
 export default function RootNavigator() {
   return (
-    <RootStack.Navigator screenOptions={{ headerShown: false }}>
+    <RootStack.Navigator screenOptions={{ headerShown: false }} initialRouteName="Splash">
+      <RootStack.Screen name="Splash" component={SplashScreen} />
       <RootStack.Screen name="IPConfig" component={IPConfigScreen} />
       <RootStack.Screen name="MainApp" component={MainTabs} />
     </RootStack.Navigator>

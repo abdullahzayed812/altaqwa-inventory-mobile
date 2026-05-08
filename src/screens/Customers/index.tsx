@@ -87,9 +87,14 @@ export default function CustomersScreen({ navigation }: any) {
                 {c.phone && <Text style={styles.sub}>{c.phone}</Text>}
               </View>
               <View style={styles.debtBox}>
-                {c.totalDebt > 0 ? (
+                {c.totalDebt < 0 ? (
+                  <View style={[styles.debtBadge, { backgroundColor: COLORS.success + "12" }]}>
+                    <Text style={[styles.debtValue, { color: COLORS.success }]}>دائن: {Math.abs(c.totalDebt).toLocaleString("ar-EG")}</Text>
+                    <Text style={[styles.debtCurrency, { color: COLORS.success }]}>{CURRENCY}</Text>
+                  </View>
+                ) : c.totalDebt > 0 ? (
                   <View style={styles.debtBadge}>
-                    <Text style={styles.debtValue}>{c.totalDebt.toLocaleString("ar-EG")}</Text>
+                    <Text style={styles.debtValue}>مدين: {c.totalDebt.toLocaleString("ar-EG")}</Text>
                     <Text style={styles.debtCurrency}>{CURRENCY}</Text>
                   </View>
                 ) : (
