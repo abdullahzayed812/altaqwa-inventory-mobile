@@ -1,21 +1,11 @@
 import axios from 'axios';
-import { getBaseUrl } from './config';
+import { BASE_URL } from './config';
 
 const client = axios.create({
+  baseURL: BASE_URL,
   timeout: 10000,
   headers: { 'Content-Type': 'application/json' },
 });
-
-// Request interceptor to set baseURL dynamically
-client.interceptors.request.use(
-  async (config) => {
-    if (!config.baseURL) {
-      config.baseURL = await getBaseUrl();
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
 
 client.interceptors.response.use(
   (response) => response,

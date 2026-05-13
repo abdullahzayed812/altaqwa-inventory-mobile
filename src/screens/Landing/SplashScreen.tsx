@@ -23,9 +23,8 @@ const SplashScreen = ({ navigation }: any) => {
             }),
         ]).start();
 
-        // Navigate to IPConfig after 2.5 seconds
         const timer = setTimeout(() => {
-            navigation.replace("IPConfig");
+            navigation.replace("MainApp");
         }, 2500);
 
         return () => clearTimeout(timer);

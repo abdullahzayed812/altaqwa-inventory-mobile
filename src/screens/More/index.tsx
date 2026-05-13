@@ -9,7 +9,6 @@ const ITEMS = [
   { icon: "💳", label: "مدفوعات العملاء", sub: "تتبع الدفعات المستلمة", screen: "Payments", color: COLORS.success },
   { icon: "🚗", label: "السائقون", sub: "إدارة فريق التوصيل", screen: "Drivers", color: COLORS.warning },
   { icon: "📊", label: "التقارير", sub: "تقارير الأداء والإيرادات", screen: "Reports", color: COLORS.balanceBlue },
-  { icon: "⚙️", label: "إعدادات الاتصال", sub: "عنوان IP للخادم", screen: "IPConfig", isRoot: true, color: COLORS.textSecondary },
 ];
 
 export default function MoreScreen({ navigation }: any) {
