@@ -1,45 +1,55 @@
-import React, { useCallback, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert, Modal, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
-import { getDrivers, createDriver, updateDriverAvailability } from '../../api';
-import { Driver } from '../../types';
-import Card from '../../components/Card';
-import LoadingSpinner from '../../components/LoadingSpinner';
-import EmptyState from '../../components/EmptyState';
-import { COLORS } from '../../constants/theme';
+import React, { useCallback, useState } from "react";
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert, Modal, TextInput, KeyboardAvoidingView, Platform } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useFocusEffect } from "@react-navigation/native";
+import { getDrivers, createDriver, updateDriverAvailability } from "../../api";
+import { Driver } from "../../types";
+import Card from "../../components/Card";
+import LoadingSpinner from "../../components/LoadingSpinner";
+import EmptyState from "../../components/EmptyState";
+import { COLORS } from "../../constants/theme";
+import { TouchableWithoutFeedback } from "react-native-gesture-handler";
 
-export default function DriversScreen() {
+export default function DriversScreen({ navigation }: any) {
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [plate, setPlate] = useState('');
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [plate, setPlate] = useState("");
   const [saving, setSaving] = useState(false);
 
   const load = async () => {
     try {
       setDrivers(await getDrivers());
     } catch (e: any) {
-      Alert.alert('خطأ', e.message);
+      Alert.alert("خطأ", e.message);
     } finally {
       setLoading(false);
     }
   };
 
-  useFocusEffect(useCallback(() => { load(); }, []));
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, []),
+  );
 
   const save = async () => {
-    if (!name.trim()) { Alert.alert('خطأ', 'الاسم مطلوب'); return; }
+    if (!name.trim()) {
+      Alert.alert("خطأ", "الاسم مطلوب");
+      return;
+    }
     setSaving(true);
     try {
       await createDriver({ name: name.trim(), phone: phone.trim() || undefined, vehiclePlate: plate.trim() || undefined });
       setModalVisible(false);
-      setName(''); setPhone(''); setPlate('');
+      setName("");
+      setPhone("");
+      setPlate("");
       load();
     } catch (e: any) {
-      Alert.alert('خطأ', e.message);
+      Alert.alert("خطأ", e.message);
     } finally {
       setSaving(false);
     }
@@ -50,35 +60,40 @@ export default function DriversScreen() {
       await updateDriverAvailability(d.id, !d.isAvailable);
       load();
     } catch (e: any) {
-      Alert.alert('خطأ', e.message);
+      Alert.alert("خطأ", e.message);
     }
   };
 
   if (loading) return <LoadingSpinner />;
 
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom']}>
+    <SafeAreaView style={styles.safe} edges={["bottom"]}>
       <FlatList
         data={drivers}
-        keyExtractor={d => String(d.id)}
+        keyExtractor={(d) => String(d.id)}
         contentContainerStyle={styles.list}
         ListEmptyComponent={<EmptyState icon="🚗" message="لا يوجد سائقون" />}
         renderItem={({ item: d }) => (
-          <Card>
-            <View style={styles.row}>
-              <TouchableOpacity
-                style={[styles.availBadge, { backgroundColor: d.isAvailable ? COLORS.success : COLORS.textSecondary }]}
-                onPress={() => toggleAvailability(d)}
-              >
-                <Text style={styles.availText}>{d.isAvailable ? 'متاح' : 'مشغول'}</Text>
-              </TouchableOpacity>
-              <View style={styles.info}>
-                <Text style={styles.name}>{d.name}</Text>
-                {d.phone && <Text style={styles.sub}>{d.phone}</Text>}
-                {d.vehiclePlate && <Text style={styles.sub}>🚗 {d.vehiclePlate}</Text>}
+          <TouchableWithoutFeedback onPress={() => navigation.navigate("DriverDetails", { driver: d })}>
+            <Card>
+              <View style={styles.row}>
+                {/* <TouchableOpacity
+                  style={[styles.availBadge, { backgroundColor: d.isAvailable ? COLORS.success : COLORS.textSecondary }]}
+                  onPress={() => toggleAvailability(d)}
+                >
+                  <Text style={styles.availText}>{d.isAvailable ? "متاح" : "مشغول"}</Text>
+                </TouchableOpacity> */}
+                <View style={styles.info}>
+                  <Text style={styles.name}>{d.name}</Text>
+                  {d.phone && <Text style={[styles.sub, { textAlign: "left" }]}>{d.phone}</Text>}
+                  {d.vehiclePlate && <Text style={styles.sub}>🚗 {d.vehiclePlate}</Text>}
+                  <Text style={[styles.sub, { color: d.totalBalance > 0 ? "#e74c3c" : COLORS.success, fontWeight: "bold", marginTop: 4 }]}>
+                    المديونية: {(d.totalBalance ?? 0).toLocaleString("ar-EG")}
+                  </Text>
+                </View>
               </View>
-            </View>
-          </Card>
+            </Card>
+          </TouchableWithoutFeedback>
         )}
       />
       <TouchableOpacity style={styles.fab} onPress={() => setModalVisible(true)}>
@@ -86,7 +101,7 @@ export default function DriversScreen() {
       </TouchableOpacity>
 
       <Modal visible={modalVisible} animationType="slide" transparent>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
           <View style={styles.overlay}>
             <View style={styles.modal}>
               <Text style={styles.modalTitle}>سائق جديد</Text>
@@ -95,10 +110,10 @@ export default function DriversScreen() {
               <Input value={plate} onChangeText={setPlate} placeholder="رقم اللوحة" />
               <View style={styles.modalActions}>
                 <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalVisible(false)}>
-                  <Text style={{ color: COLORS.textSecondary, fontWeight: 'bold' }}>إلغاء</Text>
+                  <Text style={{ color: COLORS.textSecondary, fontWeight: "bold" }}>إلغاء</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.saveBtn, saving && { opacity: 0.6 }]} onPress={save} disabled={saving}>
-                  <Text style={{ color: '#fff', fontWeight: 'bold' }}>{saving ? '...' : 'حفظ'}</Text>
+                  <Text style={{ color: "#fff", fontWeight: "bold" }}>{saving ? "..." : "حفظ"}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -112,7 +127,17 @@ export default function DriversScreen() {
 function Input(props: any) {
   return (
     <TextInput
-      style={{ backgroundColor: COLORS.background, borderRadius: 8, padding: 12, marginBottom: 8, fontSize: 14, color: COLORS.textPrimary, textAlign: 'right', borderWidth: 1, borderColor: COLORS.border }}
+      style={{
+        backgroundColor: COLORS.background,
+        borderRadius: 8,
+        padding: 12,
+        marginBottom: 8,
+        fontSize: 14,
+        color: COLORS.textPrimary,
+        textAlign: "right",
+        borderWidth: 1,
+        borderColor: COLORS.border,
+      }}
       placeholderTextColor={COLORS.textSecondary}
       {...props}
     />
@@ -122,18 +147,18 @@ function Input(props: any) {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: COLORS.background },
   list: { padding: 16, paddingBottom: 80 },
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  row: { flexDirection: "row-reverse", alignItems: "center", justifyContent: "space-between" },
   info: { flex: 1, marginLeft: 12 },
-  name: { fontSize: 16, fontWeight: 'bold', color: COLORS.textPrimary, textAlign: 'right' },
-  sub: { fontSize: 13, color: COLORS.textSecondary, marginTop: 2, textAlign: 'right' },
+  name: { fontSize: 16, fontWeight: "bold", color: COLORS.textPrimary },
+  sub: { fontSize: 13, color: COLORS.textSecondary, marginTop: 2 },
   availBadge: { borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
-  availText: { color: '#fff', fontWeight: 'bold', fontSize: 13 },
-  fab: { position: 'absolute', bottom: 20, left: 20, backgroundColor: COLORS.primary, borderRadius: 28, paddingHorizontal: 24, paddingVertical: 14 },
-  fabText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  availText: { color: "#fff", fontWeight: "bold", fontSize: 13 },
+  fab: { position: "absolute", bottom: 20, left: 20, backgroundColor: COLORS.primary, borderRadius: 28, paddingHorizontal: 24, paddingVertical: 14 },
+  fabText: { color: "#fff", fontWeight: "bold", fontSize: 15 },
+  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
   modal: { backgroundColor: COLORS.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: 32 },
-  modalTitle: { fontSize: 18, fontWeight: 'bold', textAlign: 'right', marginBottom: 16, color: COLORS.textPrimary },
-  modalActions: { flexDirection: 'row', marginTop: 12, gap: 12 },
-  cancelBtn: { flex: 1, borderRadius: 10, padding: 14, borderWidth: 1, borderColor: COLORS.border, alignItems: 'center' },
-  saveBtn: { flex: 1, borderRadius: 10, padding: 14, backgroundColor: COLORS.primary, alignItems: 'center' },
+  modalTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 16, color: COLORS.textPrimary },
+  modalActions: { flexDirection: "row", marginTop: 12, gap: 12 },
+  cancelBtn: { flex: 1, borderRadius: 10, padding: 14, borderWidth: 1, borderColor: COLORS.border, alignItems: "center" },
+  saveBtn: { flex: 1, borderRadius: 10, padding: 14, backgroundColor: COLORS.primary, alignItems: "center" },
 });

@@ -8,6 +8,7 @@ export default function AddCustomerScreen({ navigation }: any) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
+  const [initialDebt, setInitialDebt] = useState("");
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
@@ -15,9 +16,14 @@ export default function AddCustomerScreen({ navigation }: any) {
       Alert.alert("خطأ", "الاسم مطلوب");
       return;
     }
+    const debtValue = initialDebt.trim() ? parseFloat(initialDebt.trim()) : undefined;
+    if (debtValue !== undefined && isNaN(debtValue)) {
+      Alert.alert("خطأ", "المديونية يجب أن تكون رقماً صحيحاً");
+      return;
+    }
     setSaving(true);
     try {
-      await createCustomer({ name: name.trim(), phone: phone.trim() || undefined, address: address.trim() || undefined });
+      await createCustomer({ name: name.trim(), phone: phone.trim() || undefined, address: address.trim() || undefined, initialDebt: debtValue });
       navigation.goBack();
     } catch (e: any) {
       Alert.alert("خطأ", e.message);
@@ -36,6 +42,8 @@ export default function AddCustomerScreen({ navigation }: any) {
           <Input value={phone} onChangeText={setPhone} placeholder="رقم الهاتف" keyboardType="phone-pad" />
           <Label text="العنوان" />
           <Input value={address} onChangeText={setAddress} placeholder="العنوان" multiline />
+          <Label text="المديونية" />
+          <Input value={initialDebt} onChangeText={setInitialDebt} placeholder="0" keyboardType="numeric" />
           <TouchableOpacity style={[styles.btn, saving && styles.btnDisabled]} onPress={save} disabled={saving}>
             <Text style={styles.btnText}>{saving ? "جاري الحفظ..." : "حفظ"}</Text>
           </TouchableOpacity>

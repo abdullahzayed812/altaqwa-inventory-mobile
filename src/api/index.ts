@@ -2,7 +2,7 @@ import client from './client';
 import {
   Customer, Supplier, Product, Driver, Order, OrderStatus,
   Payment, PaymentMethod, Purchase, SupplierPayment, SupplierLedger,
-  DashboardStats, ReportData,
+  DriverLedger, DashboardStats, ReportData,
 } from '../types';
 
 // ─── Customers ────────────────────────────────────────────────────────────────
@@ -13,7 +13,7 @@ export const getCustomers = () =>
 export const getCustomerById = (id: number) =>
   client.get<Customer>(`/customers/${id}`).then(r => r.data);
 
-export const createCustomer = (data: { name: string; phone?: string; address?: string }) =>
+export const createCustomer = (data: { name: string; phone?: string; address?: string; initialDebt?: number }) =>
   client.post<Customer>('/customers', data).then(r => r.data);
 
 // ─── Products ─────────────────────────────────────────────────────────────────
@@ -77,7 +77,7 @@ export const getSuppliers = () =>
 export const getSupplierById = (id: number) =>
   client.get<Supplier>(`/suppliers/${id}`).then(r => r.data);
 
-export const createSupplier = (data: { name: string; phone?: string; address?: string }) =>
+export const createSupplier = (data: { name: string; phone?: string; address?: string; initialBalance?: number }) =>
   client.post<Supplier>('/suppliers', data).then(r => r.data);
 
 export const createPurchase = (data: {
@@ -105,11 +105,23 @@ export const getAllPurchases = () =>
 export const getDrivers = () =>
   client.get<Driver[]>('/drivers').then(r => r.data);
 
+export const getDriverById = (id: number) =>
+  client.get<Driver>(`/drivers/${id}`).then(r => r.data);
+
 export const createDriver = (data: { name: string; phone?: string; vehiclePlate?: string }) =>
   client.post<Driver>('/drivers', data).then(r => r.data);
 
 export const updateDriverAvailability = (id: number, isAvailable: boolean) =>
   client.patch<Driver>(`/drivers/${id}/availability`, { isAvailable }).then(r => r.data);
+
+export const addDriverPayment = (driverId: number, data: { amount: number; notes?: string }) =>
+  client.post(`/drivers/${driverId}/payments`, data).then(r => r.data);
+
+export const addDriverDebt = (driverId: number, data: { amount: number; notes?: string }) =>
+  client.post(`/drivers/${driverId}/debt`, data).then(r => r.data);
+
+export const getDriverLedger = (driverId: number) =>
+  client.get<DriverLedger[]>(`/drivers/${driverId}/ledger`).then(r => r.data);
 
 // ─── Dashboard & Reports ──────────────────────────────────────────────────────
 

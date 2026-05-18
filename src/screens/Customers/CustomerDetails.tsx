@@ -264,7 +264,7 @@ export default function CustomerDetailsScreen({ route, navigation }: any) {
                           <Text style={styles.orderItemCell}>{item.price}</Text>
                           <Text style={styles.orderItemCell}>{item.deliveryFeePerTon ?? 0}</Text>
                           <Text style={[styles.orderItemCell, { color: COLORS.primary, fontWeight: "700" }]}>
-                            {((item.quantity * item.price) + (item.totalDelivery ?? 0)).toLocaleString("ar-EG")}
+                            {((item.quantity * item.price) - (item.totalDelivery ?? 0)).toLocaleString("ar-EG")}
                           </Text>
                         </View>
                       ))}
@@ -275,7 +275,7 @@ export default function CustomerDetailsScreen({ route, navigation }: any) {
                   <View style={styles.orderCardFooter}>
                     {(o.totalDelivery ?? 0) > 0 && (
                       <Text style={styles.orderDeliveryText}>
-                        ناولون: {(o.totalDelivery ?? 0).toLocaleString("ar-EG")} {CURRENCY}
+                        ناولون (خصم): - {(o.totalDelivery ?? 0).toLocaleString("ar-EG")} {CURRENCY}
                       </Text>
                     )}
                     <Text style={styles.orderTotalText}>

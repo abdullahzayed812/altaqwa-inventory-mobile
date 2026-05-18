@@ -21,6 +21,7 @@ import AddPurchaseScreen from "../screens/Purchases/AddPurchase";
 import PaymentsScreen from "../screens/Payments";
 import AddPaymentScreen from "../screens/Payments/AddPayment";
 import DriversScreen from "../screens/Drivers";
+import DriverDetailsScreen from "../screens/Drivers/DriverDetails";
 import ReportsScreen from "../screens/Reports";
 import SplashScreen from "../screens/Landing/SplashScreen";
 
@@ -102,6 +103,7 @@ function MoreStack() {
       <Stack.Screen name="Payments" component={PaymentsScreen} options={{ title: "المدفوعات" }} />
       <Stack.Screen name="AddPayment" component={AddPaymentScreen} options={{ title: "إضافة دفعة" }} />
       <Stack.Screen name="Drivers" component={DriversScreen} options={{ title: "السائقون" }} />
+      <Stack.Screen name="DriverDetails" component={DriverDetailsScreen} options={{ title: "تفاصيل السائق" }} />
       <Stack.Screen name="Reports" component={ReportsScreen} options={{ title: "التقارير" }} />
     </Stack.Navigator>
   );
