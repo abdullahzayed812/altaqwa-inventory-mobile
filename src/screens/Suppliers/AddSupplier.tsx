@@ -1,14 +1,17 @@
 import React, { useState } from "react";
-import { Text, TextInput, StyleSheet, TouchableOpacity, ScrollView, Alert, KeyboardAvoidingView, Platform } from "react-native";
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView, Alert, KeyboardAvoidingView, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { createSupplier } from "../../api";
 import { COLORS } from "../../constants/theme";
+
+type BalanceType = "مدين" | "دائن";
 
 export default function AddSupplierScreen({ navigation }: any) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
-  const [initialBalance, setInitialBalance] = useState("");
+  const [balanceAmount, setBalanceAmount] = useState("");
+  const [balanceType, setBalanceType] = useState<BalanceType>("دائن");
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
@@ -16,14 +19,17 @@ export default function AddSupplierScreen({ navigation }: any) {
       Alert.alert("خطأ", "الاسم مطلوب");
       return;
     }
-    const balanceValue = initialBalance.trim() ? parseFloat(initialBalance.trim()) : undefined;
-    if (balanceValue !== undefined && isNaN(balanceValue)) {
-      Alert.alert("خطأ", "المديونية يجب أن تكون رقماً صحيحاً");
+    const raw = balanceAmount.trim() ? parseFloat(balanceAmount.trim()) : undefined;
+    if (raw !== undefined && (isNaN(raw) || raw < 0)) {
+      Alert.alert("خطأ", "المبلغ يجب أن يكون رقماً صحيحاً موجباً");
       return;
     }
+    // دائن = we owe supplier → positive balance
+    // مدين = supplier owes us → negative balance
+    const initialBalance = raw !== undefined ? (balanceType === "دائن" ? raw : -raw) : undefined;
     setSaving(true);
     try {
-      await createSupplier({ name: name.trim(), phone: phone.trim() || undefined, address: address.trim() || undefined, initialBalance: balanceValue });
+      await createSupplier({ name: name.trim(), phone: phone.trim() || undefined, address: address.trim() || undefined, initialBalance });
       navigation.goBack();
     } catch (e: any) {
       Alert.alert("خطأ", e.message);
@@ -42,8 +48,24 @@ export default function AddSupplierScreen({ navigation }: any) {
           <Input value={phone} onChangeText={setPhone} placeholder="رقم الهاتف" keyboardType="phone-pad" />
           <Label text="العنوان" />
           <Input value={address} onChangeText={setAddress} placeholder="العنوان" multiline />
-          <Label text="المديونية" />
-          <Input value={initialBalance} onChangeText={setInitialBalance} placeholder="0" keyboardType="numeric" />
+
+          <Label text="الرصيد الافتتاحي" />
+          <View style={styles.toggleRow}>
+            <TouchableOpacity
+              style={[styles.toggleBtn, balanceType === "مدين" && { backgroundColor: COLORS.debtRed, borderColor: COLORS.debtRed }]}
+              onPress={() => setBalanceType("مدين")}
+            >
+              <Text style={[styles.toggleText, balanceType === "مدين" && styles.toggleTextActive]}>مدين</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.toggleBtn, balanceType === "دائن" && { backgroundColor: COLORS.balanceBlue, borderColor: COLORS.balanceBlue }]}
+              onPress={() => setBalanceType("دائن")}
+            >
+              <Text style={[styles.toggleText, balanceType === "دائن" && styles.toggleTextActive]}>دائن</Text>
+            </TouchableOpacity>
+          </View>
+          <Input value={balanceAmount} onChangeText={setBalanceAmount} placeholder="0" keyboardType="numeric" />
+
           <TouchableOpacity style={[styles.btn, saving && styles.btnDisabled]} onPress={save} disabled={saving}>
             <Text style={styles.btnText}>{saving ? "جاري الحفظ..." : "حفظ"}</Text>
           </TouchableOpacity>
@@ -78,6 +100,18 @@ function Input(props: any) {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: COLORS.background },
   content: { padding: 20 },
+  toggleRow: { flexDirection: "row", gap: 10, marginBottom: 8 },
+  toggleBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: "center",
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.card,
+  },
+  toggleText: { fontSize: 15, fontWeight: "700", color: COLORS.textSecondary },
+  toggleTextActive: { color: "#fff" },
   btn: { backgroundColor: COLORS.primary, borderRadius: 10, padding: 16, alignItems: "center", marginTop: 24 },
   btnDisabled: { opacity: 0.6 },
   btnText: { color: "#fff", fontWeight: "bold", fontSize: 16 },

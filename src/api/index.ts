@@ -108,7 +108,7 @@ export const getDrivers = () =>
 export const getDriverById = (id: number) =>
   client.get<Driver>(`/drivers/${id}`).then(r => r.data);
 
-export const createDriver = (data: { name: string; phone?: string; vehiclePlate?: string }) =>
+export const createDriver = (data: { name: string; phone?: string; vehiclePlate?: string; initialBalance?: number }) =>
   client.post<Driver>('/drivers', data).then(r => r.data);
 
 export const updateDriverAvailability = (id: number, isAvailable: boolean) =>

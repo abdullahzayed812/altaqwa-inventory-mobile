@@ -136,9 +136,11 @@ export default function CustomerDetailsScreen({ route, navigation }: any) {
           {customer.phone && <InfoRow label="الهاتف" value={customer.phone} />}
           {customer.address && <InfoRow label="العنوان" value={customer.address} />}
           <View style={styles.debtRow}>
-            <Text style={styles.debtLabel}>المديونية</Text>
-            <Text style={[styles.debtValue, { color: customer.totalDebt > 0 ? COLORS.debtRed : COLORS.success }]}>
-              {customer.totalDebt.toLocaleString("ar-EG")} {CURRENCY}
+            <Text style={styles.debtLabel}>
+              {customer.totalDebt < 0 ? "مستحق الدفع" : "المديونية"}
+            </Text>
+            <Text style={[styles.debtValue, { color: customer.totalDebt < 0 ? COLORS.balanceBlue : customer.totalDebt > 0 ? COLORS.debtRed : COLORS.success }]}>
+              {Math.abs(customer.totalDebt).toLocaleString("ar-EG")} {CURRENCY}
             </Text>
           </View>
         </Card>

@@ -120,9 +120,11 @@ export default function DriverDetailsScreen({ route, navigation }: any) {
           {driver.vehiclePlate && <InfoRow label="اللوحة" value={`🚗 ${driver.vehiclePlate}`} />}
           {driver.vehicleDetails && <InfoRow label="المركبة" value={driver.vehicleDetails} />}
           <View style={styles.balanceRow}>
-            <Text style={styles.balanceLabel}>المديونية (مستحقاته)</Text>
-            <Text style={[styles.balanceValue, { color: driver.totalBalance > 0 ? "#e74c3c" : COLORS.success }]}>
-              {driver.totalBalance.toLocaleString("ar-EG")} {CURRENCY}
+            <Text style={styles.balanceLabel}>
+              {driver.totalBalance < 0 ? "المديونية" : "مستحق الدفع"}
+            </Text>
+            <Text style={[styles.balanceValue, { color: driver.totalBalance < 0 ? COLORS.debtRed : driver.totalBalance > 0 ? COLORS.balanceBlue : COLORS.success }]}>
+              {Math.abs(driver.totalBalance).toLocaleString("ar-EG")} {CURRENCY}
             </Text>
           </View>
         </Card>

@@ -141,9 +141,11 @@ export default function SupplierDetailsScreen({ route, navigation }: any) {
           {supplier.phone && <InfoRow label="الهاتف" value={supplier.phone} />}
           {supplier.address && <InfoRow label="العنوان" value={supplier.address} />}
           <View style={styles.balanceRow}>
-            <Text style={styles.balanceLabel}>الرصيد المستحق</Text>
-            <Text style={[styles.balanceValue, { color: supplier.totalBalance > 0 ? COLORS.balanceBlue : COLORS.success }]}>
-              {supplier.totalBalance.toLocaleString("ar-EG")} {CURRENCY}
+            <Text style={styles.balanceLabel}>
+              {supplier.totalBalance < 0 ? "المديونية" : "مستحق الدفع"}
+            </Text>
+            <Text style={[styles.balanceValue, { color: supplier.totalBalance < 0 ? COLORS.debtRed : supplier.totalBalance > 0 ? COLORS.balanceBlue : COLORS.success }]}>
+              {Math.abs(supplier.totalBalance).toLocaleString("ar-EG")} {CURRENCY}
             </Text>
           </View>
         </Card>

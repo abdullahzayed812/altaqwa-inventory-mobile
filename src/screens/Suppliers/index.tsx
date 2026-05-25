@@ -11,7 +11,7 @@ import { COLORS, CURRENCY } from "../../constants/theme";
 
 function Avatar({ name, size = 44 }: { name: string; size?: number }) {
   const initial = name.trim()[0] ?? "?";
-  const hue = ([...name].reduce((n, c) => n + c.charCodeAt(0), 0) % 360 + 180) % 360;
+  const hue = (([...name].reduce((n, c) => n + c.charCodeAt(0), 0) % 360) + 180) % 360;
   const bg = `hsl(${hue}, 40%, 52%)`;
   return (
     <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: bg, alignItems: "center", justifyContent: "center" }}>
@@ -38,10 +38,17 @@ export default function SuppliersScreen({ navigation }: any) {
     }
   };
 
-  useFocusEffect(useCallback(() => { load(); }, []));
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, []),
+  );
 
   React.useEffect(() => {
-    if (!search.trim()) { setFiltered(suppliers); return; }
+    if (!search.trim()) {
+      setFiltered(suppliers);
+      return;
+    }
     const q = search.toLowerCase();
     setFiltered(suppliers.filter((s) => s.name.toLowerCase().includes(q) || s.phone?.includes(q)));
   }, [search, suppliers]);
@@ -80,14 +87,14 @@ export default function SuppliersScreen({ navigation }: any) {
                 {s.phone && <Text style={styles.sub}>{s.phone}</Text>}
               </View>
               <View style={styles.balanceBox}>
-                {s.totalBalance < 0 ? (
+                {s.totalBalance > 0 ? (
                   <View style={[styles.balanceBadge, { backgroundColor: COLORS.success + "12" }]}>
                     <Text style={[styles.balanceValue, { color: COLORS.success }]}>دائن: {Math.abs(s.totalBalance).toLocaleString("ar-EG")}</Text>
                     <Text style={[styles.balanceCurrency, { color: COLORS.success }]}>{CURRENCY}</Text>
                   </View>
-                ) : s.totalBalance > 0 ? (
+                ) : s.totalBalance < 0 ? (
                   <View style={styles.balanceBadge}>
-                    <Text style={styles.balanceValue}>مدين: {s.totalBalance.toLocaleString("ar-EG")}</Text>
+                    <Text style={styles.balanceValue}>مدين: {Math.abs(s.totalBalance).toLocaleString("ar-EG")}</Text>
                     <Text style={styles.balanceCurrency}>{CURRENCY}</Text>
                   </View>
                 ) : (
