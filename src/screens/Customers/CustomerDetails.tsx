@@ -1,8 +1,8 @@
 import React, { useState, useCallback, useRef } from "react";
-import { View, Text, ScrollView, StyleSheet, Alert, TouchableOpacity, RefreshControl, TextInput, ActivityIndicator } from "react-native";
+import { View, Text, ScrollView, StyleSheet, Alert, TouchableOpacity, RefreshControl, TextInput, ActivityIndicator, Modal, KeyboardAvoidingView, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
-import { getCustomerById, getCustomerPayments, getCustomerOrders } from "../../api";
+import { getCustomerById, getCustomerPayments, getCustomerOrders, updateCustomer, deleteCustomer } from "../../api";
 import { Customer, Payment, Order } from "../../types";
 import Card from "../../components/Card";
 import DateRangePicker, { DateRange, toISO } from "../../components/DateRangePicker";
@@ -20,6 +20,12 @@ export default function CustomerDetailsScreen({ route, navigation }: any) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  const [editVisible, setEditVisible] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editAddress, setEditAddress] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
 
   const [paySearch, setPaySearch] = useState("");
   const [payRange, setPayRange] = useState<DateRange>(EMPTY_RANGE);
@@ -110,6 +116,53 @@ export default function CustomerDetailsScreen({ route, navigation }: any) {
     loadOrders(ordSearch, range);
   };
 
+  const openEdit = () => {
+    setEditName(customer.name);
+    setEditPhone(customer.phone ?? "");
+    setEditAddress(customer.address ?? "");
+    setEditVisible(true);
+  };
+
+  const saveEdit = async () => {
+    if (!editName.trim()) { Alert.alert("خطأ", "الاسم مطلوب"); return; }
+    setEditSaving(true);
+    try {
+      const updated = await updateCustomer(customer.id, {
+        name: editName.trim(),
+        phone: editPhone.trim() || null,
+        address: editAddress.trim() || null,
+      });
+      setCustomer(updated);
+      setEditVisible(false);
+    } catch (e: any) {
+      Alert.alert("خطأ", e.message);
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const confirmDelete = () => {
+    Alert.alert(
+      "حذف العميل",
+      `هل أنت متأكد من حذف "${customer.name}"؟`,
+      [
+        { text: "إلغاء", style: "cancel" },
+        {
+          text: "حذف",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteCustomer(customer.id);
+              navigation.goBack();
+            } catch (e: any) {
+              Alert.alert("خطأ", e.message);
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const totalOrders = orders.reduce((s, o) => s + o.totalAmount, 0);
   const totalPayments = payments.reduce((s, p) => s + p.amount, 0);
 
@@ -144,6 +197,15 @@ export default function CustomerDetailsScreen({ route, navigation }: any) {
             </Text>
           </View>
         </Card>
+
+        <View style={styles.editDeleteRow}>
+          <TouchableOpacity style={styles.editBtn} onPress={openEdit}>
+            <Text style={styles.editBtnText}>✎ تعديل</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.deleteBtn} onPress={confirmDelete}>
+            <Text style={styles.deleteBtnText}>🗑 حذف</Text>
+          </TouchableOpacity>
+        </View>
 
         <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate("AddPayment", { customer })}>
           <Text style={styles.actionBtnText}>+ إضافة دفعة</Text>
@@ -290,6 +352,26 @@ export default function CustomerDetailsScreen({ route, navigation }: any) {
           </>
         )}
       </ScrollView>
+      <Modal visible={editVisible} animationType="slide" transparent>
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+          <View style={styles.overlay}>
+            <View style={styles.modal}>
+              <Text style={styles.modalTitle}>تعديل العميل</Text>
+              <ModalInput value={editName} onChangeText={setEditName} placeholder="الاسم *" />
+              <ModalInput value={editPhone} onChangeText={setEditPhone} placeholder="الهاتف" keyboardType="phone-pad" />
+              <ModalInput value={editAddress} onChangeText={setEditAddress} placeholder="العنوان" multiline />
+              <View style={styles.modalActions}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditVisible(false)}>
+                  <Text style={{ color: COLORS.textSecondary, fontWeight: "bold" }}>إلغاء</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.saveBtn, editSaving && { opacity: 0.6 }]} onPress={saveEdit} disabled={editSaving}>
+                  <Text style={{ color: "#fff", fontWeight: "bold" }}>{editSaving ? "..." : "حفظ"}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -300,6 +382,26 @@ function InfoRow({ label, value }: { label: string; value: string }) {
       <Text style={{ color: COLORS.textPrimary }}>{value}</Text>
       <Text style={{ color: COLORS.textSecondary }}>{label}</Text>
     </View>
+  );
+}
+
+function ModalInput(props: any) {
+  return (
+    <TextInput
+      style={{
+        backgroundColor: COLORS.background,
+        borderRadius: 8,
+        padding: 12,
+        marginBottom: 10,
+        fontSize: 14,
+        color: COLORS.textPrimary,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        textAlign: "right",
+      }}
+      placeholderTextColor={COLORS.textSecondary}
+      {...props}
+    />
   );
 }
 
@@ -318,6 +420,17 @@ const styles = StyleSheet.create({
   },
   debtLabel: { fontSize: 14, color: COLORS.textSecondary },
   debtValue: { fontSize: 20, fontWeight: "bold" },
+  editDeleteRow: { flexDirection: "row", gap: 10, marginTop: 8, marginBottom: 4 },
+  editBtn: { flex: 1, borderRadius: 10, padding: 11, alignItems: "center", backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border },
+  editBtnText: { color: COLORS.primary, fontWeight: "700", fontSize: 14 },
+  deleteBtn: { flex: 1, borderRadius: 10, padding: 11, alignItems: "center", backgroundColor: COLORS.danger + "12", borderWidth: 1, borderColor: COLORS.danger + "50" },
+  deleteBtnText: { color: COLORS.danger, fontWeight: "700", fontSize: 14 },
+  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
+  modal: { backgroundColor: COLORS.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: 32 },
+  modalTitle: { fontSize: 18, fontWeight: "bold", color: COLORS.textPrimary, marginBottom: 16 },
+  modalActions: { flexDirection: "row", marginTop: 4, gap: 12 },
+  cancelBtn: { flex: 1, borderRadius: 10, padding: 14, borderWidth: 1, borderColor: COLORS.border, alignItems: "center" },
+  saveBtn: { flex: 1, borderRadius: 10, padding: 14, backgroundColor: COLORS.primary, alignItems: "center" },
   actionBtn: { backgroundColor: COLORS.primary, borderRadius: 10, padding: 14, marginVertical: 12, alignItems: "center" },
   actionBtnText: { color: "#fff", fontWeight: "bold", fontSize: 15 },
   tabBar: {

@@ -1,8 +1,8 @@
 import React, { useCallback, useState } from "react";
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Alert, RefreshControl, ActivityIndicator } from "react-native";
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Alert, RefreshControl, ActivityIndicator, Modal, KeyboardAvoidingView, Platform, TextInput } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
-import { getSupplierById, getSupplierLedger, getPurchaseById } from "../../api";
+import { getSupplierById, getSupplierLedger, getPurchaseById, updateSupplier, deleteSupplier } from "../../api";
 import { Purchase, Supplier, SupplierLedger, SupplierLedgerType } from "../../types";
 import Card from "../../components/Card";
 import DateRangePicker, { DateRange, toISO } from "../../components/DateRangePicker";
@@ -24,6 +24,12 @@ export default function SupplierDetailsScreen({ route, navigation }: any) {
   const [ledger, setLedger] = useState<SupplierLedger[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  const [editVisible, setEditVisible] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editAddress, setEditAddress] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
 
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("ALL");
   const [dateRange, setDateRange] = useState<DateRange>(EMPTY_RANGE);
@@ -115,6 +121,53 @@ export default function SupplierDetailsScreen({ route, navigation }: any) {
     }
   };
 
+  const openEdit = () => {
+    setEditName(supplier.name);
+    setEditPhone(supplier.phone ?? "");
+    setEditAddress(supplier.address ?? "");
+    setEditVisible(true);
+  };
+
+  const saveEdit = async () => {
+    if (!editName.trim()) { Alert.alert("خطأ", "الاسم مطلوب"); return; }
+    setEditSaving(true);
+    try {
+      const updated = await updateSupplier(supplier.id, {
+        name: editName.trim(),
+        phone: editPhone.trim() || null,
+        address: editAddress.trim() || null,
+      });
+      setSupplier(updated);
+      setEditVisible(false);
+    } catch (e: any) {
+      Alert.alert("خطأ", e.message);
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const confirmDelete = () => {
+    Alert.alert(
+      "حذف المورد",
+      `هل أنت متأكد من حذف "${supplier.name}"؟`,
+      [
+        { text: "إلغاء", style: "cancel" },
+        {
+          text: "حذف",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteSupplier(supplier.id);
+              navigation.goBack();
+            } catch (e: any) {
+              Alert.alert("خطأ", e.message);
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const fmt = (d: string | Date) => new Date(d).toLocaleDateString("ar-EG");
 
   const totalPurchases = ledger.filter((e) => e.type === SupplierLedgerType.PURCHASE).reduce((s, e) => s + e.amount, 0);
@@ -149,6 +202,16 @@ export default function SupplierDetailsScreen({ route, navigation }: any) {
             </Text>
           </View>
         </Card>
+
+        {/* Edit / Delete */}
+        <View style={styles.editDeleteRow}>
+          <TouchableOpacity style={styles.editBtn} onPress={openEdit}>
+            <Text style={styles.editBtnText}>✎ تعديل</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.deleteBtn} onPress={confirmDelete}>
+            <Text style={styles.deleteBtnText}>🗑 حذف</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Actions */}
         <View style={styles.actionsRow}>
@@ -278,6 +341,26 @@ export default function SupplierDetailsScreen({ route, navigation }: any) {
           })
         )}
       </ScrollView>
+      <Modal visible={editVisible} animationType="slide" transparent>
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+          <View style={styles.overlay}>
+            <View style={styles.modal}>
+              <Text style={styles.modalTitle}>تعديل المورد</Text>
+              <ModalInput value={editName} onChangeText={setEditName} placeholder="الاسم *" />
+              <ModalInput value={editPhone} onChangeText={setEditPhone} placeholder="الهاتف" keyboardType="phone-pad" />
+              <ModalInput value={editAddress} onChangeText={setEditAddress} placeholder="العنوان" multiline />
+              <View style={styles.modalActions}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditVisible(false)}>
+                  <Text style={{ color: COLORS.textSecondary, fontWeight: "bold" }}>إلغاء</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.saveBtn, editSaving && { opacity: 0.6 }]} onPress={saveEdit} disabled={editSaving}>
+                  <Text style={{ color: "#fff", fontWeight: "bold" }}>{editSaving ? "..." : "حفظ"}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -288,6 +371,26 @@ function InfoRow({ label, value }: { label: string; value: string }) {
       <Text style={{ color: COLORS.textPrimary }}>{value}</Text>
       <Text style={{ color: COLORS.textSecondary }}>{label}</Text>
     </View>
+  );
+}
+
+function ModalInput(props: any) {
+  return (
+    <TextInput
+      style={{
+        backgroundColor: COLORS.background,
+        borderRadius: 8,
+        padding: 12,
+        marginBottom: 10,
+        fontSize: 14,
+        color: COLORS.textPrimary,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        textAlign: "right",
+      }}
+      placeholderTextColor={COLORS.textSecondary}
+      {...props}
+    />
   );
 }
 
@@ -306,6 +409,17 @@ const styles = StyleSheet.create({
   },
   balanceLabel: { fontSize: 14, color: COLORS.textSecondary },
   balanceValue: { fontSize: 20, fontWeight: "bold" },
+  editDeleteRow: { flexDirection: "row", gap: 10, marginTop: 8, marginBottom: 4 },
+  editBtn: { flex: 1, borderRadius: 10, padding: 11, alignItems: "center", backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border },
+  editBtnText: { color: COLORS.primary, fontWeight: "700", fontSize: 14 },
+  deleteBtn: { flex: 1, borderRadius: 10, padding: 11, alignItems: "center", backgroundColor: COLORS.danger + "12", borderWidth: 1, borderColor: COLORS.danger + "50" },
+  deleteBtnText: { color: COLORS.danger, fontWeight: "700", fontSize: 14 },
+  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
+  modal: { backgroundColor: COLORS.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: 32 },
+  modalTitle: { fontSize: 18, fontWeight: "bold", color: COLORS.textPrimary, marginBottom: 16 },
+  modalActions: { flexDirection: "row", marginTop: 4, gap: 12 },
+  cancelBtn: { flex: 1, borderRadius: 10, padding: 14, borderWidth: 1, borderColor: COLORS.border, alignItems: "center" },
+  saveBtn: { flex: 1, borderRadius: 10, padding: 14, backgroundColor: COLORS.primary, alignItems: "center" },
   actionsRow: { flexDirection: "row", marginVertical: 12 },
   actionBtn: { flex: 1, borderRadius: 10, padding: 14, alignItems: "center" },
   actionBtnText: { color: "#fff", fontWeight: "bold", fontSize: 14 },

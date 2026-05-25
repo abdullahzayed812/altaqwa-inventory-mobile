@@ -16,6 +16,12 @@ export const getCustomerById = (id: number) =>
 export const createCustomer = (data: { name: string; phone?: string; address?: string; initialDebt?: number }) =>
   client.post<Customer>('/customers', data).then(r => r.data);
 
+export const updateCustomer = (id: number, data: { name?: string; phone?: string | null; address?: string | null }) =>
+  client.put<Customer>(`/customers/${id}`, data).then(r => r.data);
+
+export const deleteCustomer = (id: number) =>
+  client.delete(`/customers/${id}`);
+
 // ─── Products ─────────────────────────────────────────────────────────────────
 
 export const getProducts = () =>
@@ -80,6 +86,12 @@ export const getSupplierById = (id: number) =>
 export const createSupplier = (data: { name: string; phone?: string; address?: string; initialBalance?: number }) =>
   client.post<Supplier>('/suppliers', data).then(r => r.data);
 
+export const updateSupplier = (id: number, data: { name?: string; phone?: string | null; address?: string | null }) =>
+  client.put<Supplier>(`/suppliers/${id}`, data).then(r => r.data);
+
+export const deleteSupplier = (id: number) =>
+  client.delete(`/suppliers/${id}`);
+
 export const createPurchase = (data: {
   supplierId: number;
   items: { productId: number; quantity: number; price: number }[];
@@ -110,6 +122,12 @@ export const getDriverById = (id: number) =>
 
 export const createDriver = (data: { name: string; phone?: string; vehiclePlate?: string; initialBalance?: number }) =>
   client.post<Driver>('/drivers', data).then(r => r.data);
+
+export const updateDriver = (id: number, data: { name?: string; phone?: string | null; vehiclePlate?: string | null; vehicleDetails?: string | null }) =>
+  client.put<Driver>(`/drivers/${id}`, data).then(r => r.data);
+
+export const deleteDriver = (id: number) =>
+  client.delete(`/drivers/${id}`);
 
 export const updateDriverAvailability = (id: number, isAvailable: boolean) =>
   client.patch<Driver>(`/drivers/${id}/availability`, { isAvailable }).then(r => r.data);

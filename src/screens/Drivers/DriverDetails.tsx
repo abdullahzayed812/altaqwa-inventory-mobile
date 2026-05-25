@@ -15,12 +15,12 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
-import { getDriverById, getDriverLedger, addDriverPayment, addDriverDebt } from "../../api";
+import { getDriverById, getDriverLedger, addDriverPayment, addDriverDebt, updateDriver, deleteDriver } from "../../api";
 import { Driver, DriverLedger, DriverLedgerType } from "../../types";
 import Card from "../../components/Card";
 import { COLORS, CURRENCY } from "../../constants/theme";
 
-type ModalType = "payment" | "debt" | null;
+type ModalType = "payment" | "debt" | "edit" | null;
 
 const LEDGER_LABELS: Record<DriverLedgerType, string> = {
   [DriverLedgerType.DELIVERY]: "ناولون طلب",
@@ -44,6 +44,12 @@ export default function DriverDetailsScreen({ route, navigation }: any) {
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
 
+  const [editName, setEditName] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editPlate, setEditPlate] = useState("");
+  const [editVehicle, setEditVehicle] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+
   const loadAll = useCallback(async () => {
     try {
       const [freshDriver, entries] = await Promise.all([getDriverById(driver.id), getDriverLedger(driver.id)]);
@@ -64,12 +70,60 @@ export default function DriverDetailsScreen({ route, navigation }: any) {
   );
 
   const openModal = (type: ModalType) => {
-    setAmount("");
-    setNotes("");
+    if (type === "edit") {
+      setEditName(driver.name);
+      setEditPhone(driver.phone ?? "");
+      setEditPlate(driver.vehiclePlate ?? "");
+      setEditVehicle(driver.vehicleDetails ?? "");
+    } else {
+      setAmount("");
+      setNotes("");
+    }
     setModalType(type);
   };
 
   const closeModal = () => setModalType(null);
+
+  const saveEdit = async () => {
+    if (!editName.trim()) { Alert.alert("خطأ", "الاسم مطلوب"); return; }
+    setEditSaving(true);
+    try {
+      const updated = await updateDriver(driver.id, {
+        name: editName.trim(),
+        phone: editPhone.trim() || null,
+        vehiclePlate: editPlate.trim() || null,
+        vehicleDetails: editVehicle.trim() || null,
+      });
+      setDriver(updated);
+      setModalType(null);
+    } catch (e: any) {
+      Alert.alert("خطأ", e.message);
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const confirmDelete = () => {
+    Alert.alert(
+      "حذف السائق",
+      `هل أنت متأكد من حذف "${driver.name}"؟`,
+      [
+        { text: "إلغاء", style: "cancel" },
+        {
+          text: "حذف",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteDriver(driver.id);
+              navigation.goBack();
+            } catch (e: any) {
+              Alert.alert("خطأ", e.message);
+            }
+          },
+        },
+      ],
+    );
+  };
 
   const submit = async () => {
     const val = parseFloat(amount.trim());
@@ -128,6 +182,16 @@ export default function DriverDetailsScreen({ route, navigation }: any) {
             </Text>
           </View>
         </Card>
+
+        {/* Edit / Delete */}
+        <View style={styles.editDeleteRow}>
+          <TouchableOpacity style={styles.editBtn} onPress={() => openModal("edit")}>
+            <Text style={styles.editBtnText}>✎ تعديل</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.deleteBtn} onPress={confirmDelete}>
+            <Text style={styles.deleteBtnText}>🗑 حذف</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Action buttons */}
         <View style={styles.actionsRow}>
@@ -190,8 +254,31 @@ export default function DriverDetailsScreen({ route, navigation }: any) {
         )}
       </ScrollView>
 
+      {/* Edit Modal */}
+      <Modal visible={modalType === "edit"} animationType="slide" transparent>
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+          <View style={styles.overlay}>
+            <View style={styles.modal}>
+              <Text style={styles.modalTitle}>تعديل السائق</Text>
+              <TextInput style={styles.modalInput} value={editName} onChangeText={setEditName} placeholder="الاسم *" textAlign="right" placeholderTextColor={COLORS.textSecondary} />
+              <TextInput style={styles.modalInput} value={editPhone} onChangeText={setEditPhone} placeholder="الهاتف" keyboardType="phone-pad" textAlign="right" placeholderTextColor={COLORS.textSecondary} />
+              <TextInput style={styles.modalInput} value={editPlate} onChangeText={setEditPlate} placeholder="رقم اللوحة" textAlign="right" placeholderTextColor={COLORS.textSecondary} />
+              <TextInput style={styles.modalInput} value={editVehicle} onChangeText={setEditVehicle} placeholder="تفاصيل المركبة" textAlign="right" placeholderTextColor={COLORS.textSecondary} />
+              <View style={styles.modalActions}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={closeModal}>
+                  <Text style={{ color: COLORS.textSecondary, fontWeight: "bold" }}>إلغاء</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.saveBtn, { backgroundColor: COLORS.primary }, editSaving && { opacity: 0.6 }]} onPress={saveEdit} disabled={editSaving}>
+                  <Text style={{ color: "#fff", fontWeight: "bold" }}>{editSaving ? "..." : "حفظ"}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
       {/* Payment / Debt Modal */}
-      <Modal visible={modalType !== null} animationType="slide" transparent>
+      <Modal visible={modalType === "payment" || modalType === "debt"} animationType="slide" transparent>
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
           <View style={styles.overlay}>
             <View style={styles.modal}>
@@ -260,6 +347,11 @@ const styles = StyleSheet.create({
   balanceLabel: { fontSize: 14, color: COLORS.textSecondary },
   balanceValue: { fontSize: 20, fontWeight: "bold" },
 
+  editDeleteRow: { flexDirection: "row", gap: 10, marginBottom: 4 },
+  editBtn: { flex: 1, borderRadius: 10, padding: 11, alignItems: "center", backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border },
+  editBtnText: { color: COLORS.primary, fontWeight: "700", fontSize: 14 },
+  deleteBtn: { flex: 1, borderRadius: 10, padding: 11, alignItems: "center", backgroundColor: COLORS.danger + "12", borderWidth: 1, borderColor: COLORS.danger + "50" },
+  deleteBtnText: { color: COLORS.danger, fontWeight: "700", fontSize: 14 },
   actionsRow: { flexDirection: "row", gap: 12, marginVertical: 12 },
   actionBtn: { flex: 1, borderRadius: 12, padding: 16, alignItems: "center" },
   paymentBtn: { backgroundColor: COLORS.success },
