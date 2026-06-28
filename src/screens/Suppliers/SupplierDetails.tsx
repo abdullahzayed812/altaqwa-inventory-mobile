@@ -2,8 +2,8 @@ import React, { useCallback, useState } from "react";
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Alert, RefreshControl, ActivityIndicator, Modal, KeyboardAvoidingView, Platform, TextInput } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
-import { getSupplierById, getSupplierLedger, getPurchaseById, updateSupplier, deleteSupplier } from "../../api";
-import { Purchase, Supplier, SupplierLedger, SupplierLedgerType } from "../../types";
+import { getSupplierById, getSupplierLedger, getPurchaseById, updateSupplier, deleteSupplier, getSupplierPaymentById, updateSupplierPayment } from "../../api";
+import { Purchase, Supplier, SupplierLedger, SupplierLedgerType, SupplierPayment } from "../../types";
 import Card from "../../components/Card";
 import DateRangePicker, { DateRange, toISO } from "../../components/DateRangePicker";
 import { COLORS, CURRENCY, LEDGER_TYPE_LABELS } from "../../constants/theme";
@@ -30,6 +30,13 @@ export default function SupplierDetailsScreen({ route, navigation }: any) {
   const [editPhone, setEditPhone] = useState("");
   const [editAddress, setEditAddress] = useState("");
   const [editSaving, setEditSaving] = useState(false);
+
+  const [editPayVisible, setEditPayVisible] = useState(false);
+  const [editingPayment, setEditingPayment] = useState<SupplierPayment | null>(null);
+  const [editPayAmount, setEditPayAmount] = useState("");
+  const [editPayMethod, setEditPayMethod] = useState<"CASH" | "BANK">("CASH");
+  const [editPayNote, setEditPayNote] = useState("");
+  const [editPaySaving, setEditPaySaving] = useState(false);
 
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("ALL");
   const [dateRange, setDateRange] = useState<DateRange>(EMPTY_RANGE);
@@ -143,6 +150,41 @@ export default function SupplierDetailsScreen({ route, navigation }: any) {
       Alert.alert("خطأ", e.message);
     } finally {
       setEditSaving(false);
+    }
+  };
+
+  const openEditPayment = async (entry: SupplierLedger) => {
+    if (!entry.referenceId) return;
+    try {
+      const p = await getSupplierPaymentById(entry.referenceId);
+      setEditingPayment(p);
+      setEditPayAmount(String(p.amount));
+      setEditPayMethod(p.method === "BANK" ? "BANK" : "CASH");
+      setEditPayNote(p.note ?? "");
+      setEditPayVisible(true);
+    } catch (e: any) {
+      Alert.alert("خطأ", e.message);
+    }
+  };
+
+  const saveEditPayment = async () => {
+    if (!editingPayment) return;
+    const amount = parseFloat(editPayAmount);
+    if (!amount || amount <= 0) { Alert.alert("خطأ", "أدخل مبلغاً صحيحاً"); return; }
+    setEditPaySaving(true);
+    try {
+      await updateSupplierPayment(editingPayment.id, {
+        amount,
+        method: editPayMethod,
+        note: editPayNote.trim() || null,
+      });
+      setEditPayVisible(false);
+      setEditingPayment(null);
+      await loadAll();
+    } catch (e: any) {
+      Alert.alert("خطأ", e.message);
+    } finally {
+      setEditPaySaving(false);
     }
   };
 
@@ -290,8 +332,12 @@ export default function SupplierDetailsScreen({ route, navigation }: any) {
                       {isPurchase ? "+" : "-"}
                       {entry.amount.toLocaleString("ar-EG")} {CURRENCY}
                     </Text>
-                    {isPurchase && (
+                    {isPurchase ? (
                       <Text style={styles.expandIcon}>{isExpanded ? "▲" : "▼"}</Text>
+                    ) : (
+                      <TouchableOpacity style={styles.editPayBtn} onPress={() => openEditPayment(entry)}>
+                        <Text style={styles.editPayBtnText}>✎</Text>
+                      </TouchableOpacity>
                     )}
                   </View>
                 </TouchableOpacity>
@@ -355,6 +401,46 @@ export default function SupplierDetailsScreen({ route, navigation }: any) {
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.saveBtn, editSaving && { opacity: 0.6 }]} onPress={saveEdit} disabled={editSaving}>
                   <Text style={{ color: "#fff", fontWeight: "bold" }}>{editSaving ? "..." : "حفظ"}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      <Modal visible={editPayVisible} animationType="slide" transparent>
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+          <View style={styles.overlay}>
+            <View style={styles.modal}>
+              <Text style={styles.modalTitle}>تعديل الدفعة</Text>
+              <ModalInput
+                value={editPayAmount}
+                onChangeText={setEditPayAmount}
+                placeholder="المبلغ"
+                keyboardType="decimal-pad"
+              />
+              <Text style={{ color: COLORS.textSecondary, fontSize: 13, marginBottom: 6 }}>طريقة الدفع</Text>
+              <View style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}>
+                <TouchableOpacity
+                  style={[styles.methodBtn, editPayMethod === "CASH" && { backgroundColor: COLORS.primary, borderColor: COLORS.primary }]}
+                  onPress={() => setEditPayMethod("CASH")}
+                >
+                  <Text style={[styles.methodBtnText, editPayMethod === "CASH" && { color: "#fff" }]}>نقدي</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.methodBtn, editPayMethod === "BANK" && { backgroundColor: COLORS.primary, borderColor: COLORS.primary }]}
+                  onPress={() => setEditPayMethod("BANK")}
+                >
+                  <Text style={[styles.methodBtnText, editPayMethod === "BANK" && { color: "#fff" }]}>حوالة</Text>
+                </TouchableOpacity>
+              </View>
+              <ModalInput value={editPayNote} onChangeText={setEditPayNote} placeholder="ملاحظات (اختياري)" multiline />
+              <View style={styles.modalActions}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={() => { setEditPayVisible(false); setEditingPayment(null); }}>
+                  <Text style={{ color: COLORS.textSecondary, fontWeight: "bold" }}>إلغاء</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.saveBtn, editPaySaving && { opacity: 0.6 }]} onPress={saveEditPayment} disabled={editPaySaving}>
+                  <Text style={{ color: "#fff", fontWeight: "bold" }}>{editPaySaving ? "..." : "حفظ"}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -457,6 +543,14 @@ const styles = StyleSheet.create({
   ledgerDate: { fontSize: 12, color: COLORS.textSecondary },
   ledgerAmount: { fontSize: 16, fontWeight: "bold" },
   expandIcon: { fontSize: 10, color: COLORS.textSecondary },
+  editPayBtn: {
+    width: 30, height: 30, borderRadius: 7,
+    backgroundColor: COLORS.primary + "18",
+    alignItems: "center", justifyContent: "center",
+  },
+  editPayBtnText: { fontSize: 14, color: COLORS.primary },
+  methodBtn: { flex: 1, paddingVertical: 10, borderRadius: 8, alignItems: "center", borderWidth: 1.5, borderColor: COLORS.border, backgroundColor: COLORS.card },
+  methodBtnText: { fontSize: 14, fontWeight: "700", color: COLORS.textSecondary },
   // Items expanded area
   itemsContainer: { marginTop: 10 },
   itemsDivider: { height: 1, backgroundColor: COLORS.border, marginBottom: 10 },

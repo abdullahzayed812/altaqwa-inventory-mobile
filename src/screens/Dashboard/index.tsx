@@ -7,6 +7,7 @@ import StatCard from "../../components/StatCard";
 import Card from "../../components/Card";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { COLORS, CURRENCY } from "../../constants/theme";
+import BgLogo from "../../components/BgLogo";
 
 export default function DashboardScreen() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -32,6 +33,7 @@ export default function DashboardScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={["bottom"]}>
+      <BgLogo />
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={
@@ -114,7 +116,7 @@ const st = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: COLORS.background },
+  safe: { flex: 1, backgroundColor: COLORS.background, overflow: "hidden" },
   content: { padding: 16, paddingBottom: 24 },
   header: {
     flexDirection: "row",

@@ -2,12 +2,12 @@ import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { COLORS } from "../../constants/theme";
+import BgLogo from "../../components/BgLogo";
 
 const ITEMS = [
   { icon: "🌾", label: "المنتجات", sub: "إدارة المخزون والأسعار", screen: "Products", color: COLORS.primary },
   { icon: "🛒", label: "المشتريات", sub: "سجل فواتير الشراء", screen: "Purchases", color: COLORS.info },
   { icon: "💳", label: "مدفوعات العملاء", sub: "تتبع الدفعات المستلمة", screen: "Payments", color: COLORS.success },
-  { icon: "🚗", label: "السائقون", sub: "إدارة فريق التوصيل", screen: "Drivers", color: COLORS.warning },
   { icon: "📊", label: "التقارير", sub: "تقارير الأداء والإيرادات", screen: "Reports", color: COLORS.balanceBlue },
 ];
 
@@ -18,6 +18,7 @@ export default function MoreScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.safe} edges={["bottom"]}>
+      <BgLogo />
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>المزيد</Text>
         {ITEMS.map((item) => (
@@ -43,7 +44,7 @@ export default function MoreScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: COLORS.background },
+  safe: { flex: 1, backgroundColor: COLORS.background, overflow: "hidden" },
   content: { padding: 16, paddingBottom: 32 },
   title: { fontSize: 22, fontWeight: "bold", color: COLORS.textPrimary, marginBottom: 16 },
   menuItem: {

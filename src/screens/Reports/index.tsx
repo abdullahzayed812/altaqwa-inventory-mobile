@@ -7,6 +7,7 @@ import { ReportData } from '../../types';
 import Card from '../../components/Card';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import { COLORS, CURRENCY } from '../../constants/theme';
+import BgLogo from '../../components/BgLogo';
 
 export default function ReportsScreen() {
   const [data, setData] = useState<ReportData | null>(null);
@@ -32,6 +33,7 @@ export default function ReportsScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <BgLogo />
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
@@ -78,7 +80,7 @@ export default function ReportsScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: COLORS.background },
+  safe: { flex: 1, backgroundColor: COLORS.background, overflow: 'hidden' },
   content: { padding: 16, paddingBottom: 32 },
   summaryCard: { backgroundColor: COLORS.primaryDark, marginBottom: 16 },
   summaryTitle: { color: 'rgba(255,255,255,0.8)', fontSize: 14, textAlign: 'right' },

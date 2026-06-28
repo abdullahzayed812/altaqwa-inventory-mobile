@@ -7,9 +7,12 @@ import { COLORS } from "../../constants/theme";
 type BalanceType = "مدين" | "دائن";
 
 export default function AddCustomerScreen({ navigation }: any) {
+  const [type, setType] = useState<"customer" | "driver">("customer");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
+  const [vehiclePlate, setVehiclePlate] = useState("");
+  const [vehicleDetails, setVehicleDetails] = useState("");
   const [balanceAmount, setBalanceAmount] = useState("");
   const [balanceType, setBalanceType] = useState<BalanceType>("مدين");
   const [saving, setSaving] = useState(false);
@@ -24,12 +27,18 @@ export default function AddCustomerScreen({ navigation }: any) {
       Alert.alert("خطأ", "المبلغ يجب أن يكون رقماً صحيحاً موجباً");
       return;
     }
-    // مدين = customer owes us → positive debt
-    // دائن = we owe customer → negative debt
     const initialDebt = raw !== undefined ? (balanceType === "مدين" ? raw : -raw) : undefined;
     setSaving(true);
     try {
-      await createCustomer({ name: name.trim(), phone: phone.trim() || undefined, address: address.trim() || undefined, initialDebt });
+      await createCustomer({
+        name: name.trim(),
+        phone: phone.trim() || undefined,
+        address: address.trim() || undefined,
+        initialDebt,
+        type,
+        vehiclePlate: type === "driver" ? (vehiclePlate.trim() || undefined) : undefined,
+        vehicleDetails: type === "driver" ? (vehicleDetails.trim() || undefined) : undefined,
+      });
       navigation.goBack();
     } catch (e: any) {
       Alert.alert("خطأ", e.message);
@@ -42,12 +51,40 @@ export default function AddCustomerScreen({ navigation }: any) {
     <SafeAreaView style={styles.safe} edges={["bottom"]}>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.content}>
+
+          <Label text="النوع" />
+          <View style={styles.toggleRow}>
+            <TouchableOpacity
+              style={[styles.toggleBtn, type === "customer" && { backgroundColor: COLORS.primary, borderColor: COLORS.primary }]}
+              onPress={() => setType("customer")}
+            >
+              <Text style={[styles.toggleText, type === "customer" && styles.toggleTextActive]}>عميل</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.toggleBtn, type === "driver" && { backgroundColor: COLORS.warning, borderColor: COLORS.warning }]}
+              onPress={() => setType("driver")}
+            >
+              <Text style={[styles.toggleText, type === "driver" && styles.toggleTextActive]}>سائق</Text>
+            </TouchableOpacity>
+          </View>
+
           <Label text="الاسم *" />
-          <Input value={name} onChangeText={setName} placeholder="اسم العميل" />
+          <Input value={name} onChangeText={setName} placeholder={type === "driver" ? "اسم السائق" : "اسم العميل"} />
+
           <Label text="الهاتف" />
           <Input value={phone} onChangeText={setPhone} placeholder="رقم الهاتف" keyboardType="phone-pad" />
+
           <Label text="العنوان" />
           <Input value={address} onChangeText={setAddress} placeholder="العنوان" multiline />
+
+          {type === "driver" && (
+            <>
+              <Label text="رقم اللوحة" />
+              <Input value={vehiclePlate} onChangeText={setVehiclePlate} placeholder="مثال: أ ب ج 1234" />
+              <Label text="تفاصيل السيارة" />
+              <Input value={vehicleDetails} onChangeText={setVehicleDetails} placeholder="مثال: كيا بيكس 2020" />
+            </>
+          )}
 
           <Label text="الرصيد الافتتاحي" />
           <View style={styles.toggleRow}>

@@ -2,7 +2,7 @@ import React, { useState, useCallback, useRef } from "react";
 import { View, Text, ScrollView, StyleSheet, Alert, TouchableOpacity, RefreshControl, TextInput, ActivityIndicator, Modal, KeyboardAvoidingView, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
-import { getCustomerById, getCustomerPayments, getCustomerOrders, updateCustomer, deleteCustomer } from "../../api";
+import { getCustomerById, getCustomerPayments, getCustomerOrders, updateCustomer, deleteCustomer, updatePayment } from "../../api";
 import { Customer, Payment, Order } from "../../types";
 import Card from "../../components/Card";
 import DateRangePicker, { DateRange, toISO } from "../../components/DateRangePicker";
@@ -26,6 +26,13 @@ export default function CustomerDetailsScreen({ route, navigation }: any) {
   const [editPhone, setEditPhone] = useState("");
   const [editAddress, setEditAddress] = useState("");
   const [editSaving, setEditSaving] = useState(false);
+
+  const [editPayVisible, setEditPayVisible] = useState(false);
+  const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
+  const [editPayAmount, setEditPayAmount] = useState("");
+  const [editPayMethod, setEditPayMethod] = useState<"CASH" | "BANK">("CASH");
+  const [editPayNotes, setEditPayNotes] = useState("");
+  const [editPaySaving, setEditPaySaving] = useState(false);
 
   const [paySearch, setPaySearch] = useState("");
   const [payRange, setPayRange] = useState<DateRange>(EMPTY_RANGE);
@@ -141,9 +148,38 @@ export default function CustomerDetailsScreen({ route, navigation }: any) {
     }
   };
 
+  const openEditPayment = (p: Payment) => {
+    setEditingPayment(p);
+    setEditPayAmount(String(p.amount));
+    setEditPayMethod(p.method === 'BANK' as any ? "BANK" : "CASH");
+    setEditPayNotes(p.notes ?? "");
+    setEditPayVisible(true);
+  };
+
+  const saveEditPayment = async () => {
+    if (!editingPayment) return;
+    const amount = parseFloat(editPayAmount);
+    if (!amount || amount <= 0) { Alert.alert("خطأ", "أدخل مبلغاً صحيحاً"); return; }
+    setEditPaySaving(true);
+    try {
+      await updatePayment(editingPayment.id, {
+        amount,
+        method: editPayMethod,
+        notes: editPayNotes.trim() || null,
+      });
+      setEditPayVisible(false);
+      setEditingPayment(null);
+      await loadAll();
+    } catch (e: any) {
+      Alert.alert("خطأ", e.message);
+    } finally {
+      setEditPaySaving(false);
+    }
+  };
+
   const confirmDelete = () => {
     Alert.alert(
-      "حذف العميل",
+      "حذف",
       `هل أنت متأكد من حذف "${customer.name}"؟`,
       [
         { text: "إلغاء", style: "cancel" },
@@ -185,9 +221,19 @@ export default function CustomerDetailsScreen({ route, navigation }: any) {
       >
         {/* Info Card */}
         <Card>
-          <Text style={styles.name}>{customer.name}</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 4, gap: 8 }}>
+            <Text style={styles.name}>{customer.name}</Text>
+            <View style={[styles.typeBadge, { backgroundColor: (customer.type as any) === 'driver' ? COLORS.warning + "22" : COLORS.primary + "22" }]}>
+              <Text style={[styles.typeBadgeText, { color: (customer.type as any) === 'driver' ? COLORS.warning : COLORS.primary }]}>
+                {(customer.type as any) === 'driver' ? 'سائق' : 'عميل'}
+              </Text>
+            </View>
+          </View>
           {customer.phone && <InfoRow label="الهاتف" value={customer.phone} />}
           {customer.address && <InfoRow label="العنوان" value={customer.address} />}
+          {(customer.type as any) === 'driver' && customer.vehiclePlate && (
+            <InfoRow label="اللوحة" value={customer.vehiclePlate} />
+          )}
           <View style={styles.debtRow}>
             <Text style={styles.debtLabel}>
               {customer.totalDebt < 0 ? "مستحق الدفع" : "المديونية"}
@@ -270,7 +316,9 @@ export default function CustomerDetailsScreen({ route, navigation }: any) {
                       {p.senderName && <Text style={styles.meta}>المحول: {p.senderName}</Text>}
                       {p.notes && <Text style={styles.meta}>{p.notes}</Text>}
                     </View>
-                    <Text style={styles.checkmark}>✅</Text>
+                    <TouchableOpacity style={styles.editPayBtn} onPress={() => openEditPayment(p)}>
+                      <Text style={styles.editPayBtnText}>✎</Text>
+                    </TouchableOpacity>
                   </View>
                 </Card>
               ))
@@ -291,7 +339,6 @@ export default function CustomerDetailsScreen({ route, navigation }: any) {
             ) : (
               orders.map((o) => (
                 <View key={o.id} style={styles.orderCard}>
-                  {/* Header */}
                   <View style={styles.orderCardHeader}>
                     <View style={[styles.orderStatusBadge, { backgroundColor: ORDER_STATUS_COLORS[o.status] + "20" }]}>
                       <View style={[styles.orderStatusDot, { backgroundColor: ORDER_STATUS_COLORS[o.status] }]} />
@@ -305,15 +352,12 @@ export default function CustomerDetailsScreen({ route, navigation }: any) {
                     </View>
                   </View>
 
-                  {/* Items */}
                   {(o.items && o.items.length > 0) && (
                     <View style={styles.orderItemsSection}>
-                      {/* Column headers */}
                       <View style={styles.orderItemHeaderRow}>
                         <Text style={[styles.orderItemColHeader, { flex: 2 }]}>المنتج</Text>
                         <Text style={styles.orderItemColHeader}>الكمية</Text>
                         <Text style={styles.orderItemColHeader}>السعر</Text>
-                        <Text style={styles.orderItemColHeader}>الناولون</Text>
                         <Text style={styles.orderItemColHeader}>الإجمالي</Text>
                       </View>
                       {o.items.map((item, idx) => (
@@ -326,20 +370,18 @@ export default function CustomerDetailsScreen({ route, navigation }: any) {
                           </Text>
                           <Text style={styles.orderItemCell}>{item.quantity}</Text>
                           <Text style={styles.orderItemCell}>{item.price}</Text>
-                          <Text style={styles.orderItemCell}>{item.deliveryFeePerTon ?? 0}</Text>
                           <Text style={[styles.orderItemCell, { color: COLORS.primary, fontWeight: "700" }]}>
-                            {((item.quantity * item.price) - (item.totalDelivery ?? 0)).toLocaleString("ar-EG")}
+                            {(item.quantity * item.price).toLocaleString("ar-EG")}
                           </Text>
                         </View>
                       ))}
                     </View>
                   )}
 
-                  {/* Footer totals */}
                   <View style={styles.orderCardFooter}>
-                    {(o.totalDelivery ?? 0) > 0 && (
+                    {(o.naulonUncollected ?? 0) > 0 && (
                       <Text style={styles.orderDeliveryText}>
-                        ناولون (خصم): - {(o.totalDelivery ?? 0).toLocaleString("ar-EG")} {CURRENCY}
+                        ناولون: - {(o.naulonUncollected ?? 0).toLocaleString("ar-EG")} {CURRENCY}
                       </Text>
                     )}
                     <Text style={styles.orderTotalText}>
@@ -352,11 +394,13 @@ export default function CustomerDetailsScreen({ route, navigation }: any) {
           </>
         )}
       </ScrollView>
+
+      {/* Edit Customer Modal */}
       <Modal visible={editVisible} animationType="slide" transparent>
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
           <View style={styles.overlay}>
             <View style={styles.modal}>
-              <Text style={styles.modalTitle}>تعديل العميل</Text>
+              <Text style={styles.modalTitle}>تعديل البيانات</Text>
               <ModalInput value={editName} onChangeText={setEditName} placeholder="الاسم *" />
               <ModalInput value={editPhone} onChangeText={setEditPhone} placeholder="الهاتف" keyboardType="phone-pad" />
               <ModalInput value={editAddress} onChangeText={setEditAddress} placeholder="العنوان" multiline />
@@ -366,6 +410,47 @@ export default function CustomerDetailsScreen({ route, navigation }: any) {
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.saveBtn, editSaving && { opacity: 0.6 }]} onPress={saveEdit} disabled={editSaving}>
                   <Text style={{ color: "#fff", fontWeight: "bold" }}>{editSaving ? "..." : "حفظ"}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Edit Payment Modal */}
+      <Modal visible={editPayVisible} animationType="slide" transparent>
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+          <View style={styles.overlay}>
+            <View style={styles.modal}>
+              <Text style={styles.modalTitle}>تعديل الدفعة</Text>
+              <ModalInput
+                value={editPayAmount}
+                onChangeText={setEditPayAmount}
+                placeholder="المبلغ"
+                keyboardType="decimal-pad"
+              />
+              <Text style={{ color: COLORS.textSecondary, fontSize: 13, marginBottom: 6 }}>طريقة الدفع</Text>
+              <View style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}>
+                <TouchableOpacity
+                  style={[styles.methodBtn, editPayMethod === "CASH" && { backgroundColor: COLORS.primary, borderColor: COLORS.primary }]}
+                  onPress={() => setEditPayMethod("CASH")}
+                >
+                  <Text style={[styles.methodBtnText, editPayMethod === "CASH" && { color: "#fff" }]}>نقدي</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.methodBtn, editPayMethod === "BANK" && { backgroundColor: COLORS.primary, borderColor: COLORS.primary }]}
+                  onPress={() => setEditPayMethod("BANK")}
+                >
+                  <Text style={[styles.methodBtnText, editPayMethod === "BANK" && { color: "#fff" }]}>حوالة</Text>
+                </TouchableOpacity>
+              </View>
+              <ModalInput value={editPayNotes} onChangeText={setEditPayNotes} placeholder="ملاحظات (اختياري)" multiline />
+              <View style={styles.modalActions}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={() => { setEditPayVisible(false); setEditingPayment(null); }}>
+                  <Text style={{ color: COLORS.textSecondary, fontWeight: "bold" }}>إلغاء</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.saveBtn, editPaySaving && { opacity: 0.6 }]} onPress={saveEditPayment} disabled={editPaySaving}>
+                  <Text style={{ color: "#fff", fontWeight: "bold" }}>{editPaySaving ? "..." : "حفظ"}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -408,7 +493,9 @@ function ModalInput(props: any) {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: COLORS.background },
   content: { padding: 16, paddingBottom: 32 },
-  name: { fontSize: 20, fontWeight: "bold", color: COLORS.textPrimary, marginBottom: 8 },
+  name: { fontSize: 20, fontWeight: "bold", color: COLORS.textPrimary },
+  typeBadge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2 },
+  typeBadgeText: { fontSize: 12, fontWeight: "700" },
   debtRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -431,6 +518,8 @@ const styles = StyleSheet.create({
   modalActions: { flexDirection: "row", marginTop: 4, gap: 12 },
   cancelBtn: { flex: 1, borderRadius: 10, padding: 14, borderWidth: 1, borderColor: COLORS.border, alignItems: "center" },
   saveBtn: { flex: 1, borderRadius: 10, padding: 14, backgroundColor: COLORS.primary, alignItems: "center" },
+  methodBtn: { flex: 1, paddingVertical: 10, borderRadius: 8, alignItems: "center", borderWidth: 1.5, borderColor: COLORS.border, backgroundColor: COLORS.card },
+  methodBtnText: { fontSize: 14, fontWeight: "700", color: COLORS.textSecondary },
   actionBtn: { backgroundColor: COLORS.primary, borderRadius: 10, padding: 14, marginVertical: 12, alignItems: "center" },
   actionBtnText: { color: "#fff", fontWeight: "bold", fontSize: 15 },
   tabBar: {
@@ -461,9 +550,13 @@ const styles = StyleSheet.create({
   amount: { fontSize: 16, fontWeight: "bold", color: COLORS.textPrimary },
   meta: { fontSize: 12, color: COLORS.textSecondary, marginTop: 2 },
   orderNum: { textAlign: "left", fontSize: 13, color: COLORS.textSecondary },
-  checkmark: { fontSize: 24 },
-  statusBadge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
-  statusText: { color: "#fff", fontSize: 12, fontWeight: "bold" },
+  editPayBtn: {
+    width: 34, height: 34, borderRadius: 8,
+    backgroundColor: COLORS.primary + "15",
+    alignItems: "center", justifyContent: "center",
+    marginLeft: 8,
+  },
+  editPayBtnText: { fontSize: 16, color: COLORS.primary },
   empty: { color: COLORS.textSecondary, textAlign: "center", padding: 24 },
   summaryStrip: {
     flexDirection: "row",
@@ -479,7 +572,6 @@ const styles = StyleSheet.create({
   summaryLabel: { fontSize: 11, color: COLORS.textSecondary, marginBottom: 4 },
   summaryValue: { fontSize: 15, fontWeight: "bold" },
 
-  // Order card
   orderCard: {
     backgroundColor: COLORS.card,
     borderRadius: 14,

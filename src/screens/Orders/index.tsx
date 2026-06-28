@@ -8,11 +8,11 @@ import Card from "../../components/Card";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import EmptyState from "../../components/EmptyState";
 import { COLORS, CURRENCY, ORDER_STATUS_COLORS, ORDER_STATUS_LABELS } from "../../constants/theme";
+import BgLogo from "../../components/BgLogo";
 
 const STATUS_FILTERS = [
   { label: "الكل", value: "ALL" },
   { label: "انتظار", value: OrderStatus.PENDING },
-  { label: "توصيل", value: OrderStatus.ASSIGNED },
   { label: "تم التسليم", value: OrderStatus.DELIVERED },
   { label: "ملغي", value: OrderStatus.CANCELLED },
 ];
@@ -57,6 +57,7 @@ export default function OrdersScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.safe} edges={["bottom"]}>
+      <BgLogo />
       {/* Filter chips */}
       <ScrollView
         horizontal
@@ -99,18 +100,17 @@ export default function OrdersScreen({ navigation }: any) {
             {/* Customer + amount */}
             <View style={styles.cardBody}>
               <View style={styles.customerRow}>
-                <Text style={styles.customerIcon}>{o.customerType === 'DRIVER' ? '🚚' : '👤'}</Text>
-                <Text style={styles.customerName}>
-                  {o.customerType === 'DRIVER' ? o.assignedDriver?.name || 'سائق غير محدد' : o.customer?.name || 'عميل غير محدد'}
+                <Text style={styles.customerIcon}>
+                  {(o.customer as any)?.type === 'driver' ? '🚗' : '👤'}
                 </Text>
-                <Text style={styles.customerTypeLabel}>
-                  ({o.customerType === 'DRIVER' ? 'سائق' : 'شركة'})
+                <Text style={styles.customerName}>
+                  {o.customer?.name || 'عميل غير محدد'}
                 </Text>
               </View>
               <View style={{ alignItems: 'flex-end' }}>
                 <Text style={styles.total}>{o.totalAmount.toLocaleString("ar-EG")} {CURRENCY}</Text>
-                {(o.totalDelivery ?? 0) > 0 && (
-                  <Text style={styles.deliveryTotal}>ناولون: {o.totalDelivery?.toLocaleString("ar-EG")} {CURRENCY}</Text>
+                {(o.naulonUncollected ?? 0) > 0 && (
+                  <Text style={styles.deliveryTotal}>ناولون: {o.naulonUncollected?.toLocaleString("ar-EG")} {CURRENCY}</Text>
                 )}
               </View>
             </View>
@@ -121,7 +121,6 @@ export default function OrdersScreen({ navigation }: any) {
             {(o.items ?? []).slice(0, 2).map((item) => (
               <Text key={item.id} style={styles.itemLine}>
                 • {item.product?.name} × {item.quantity} طن
-                {(item.deliveryFeePerTon ?? 0) > 0 ? ` (ناولون: ${item.deliveryFeePerTon} ${CURRENCY}/طن)` : ''}
               </Text>
             ))}
             {(o.items?.length ?? 0) > 2 && (
@@ -129,16 +128,14 @@ export default function OrdersScreen({ navigation }: any) {
             )}
 
             {/* Actions */}
-            {(o.status === OrderStatus.PENDING || o.status === OrderStatus.ASSIGNED) && (
+            {o.status === OrderStatus.PENDING && (
               <View style={styles.actions}>
-                {o.status === OrderStatus.PENDING && (
-                  <TouchableOpacity
-                    style={[styles.actionBtn, { backgroundColor: COLORS.success }]}
-                    onPress={() => changeStatus(o, OrderStatus.DELIVERED)}
-                  >
-                    <Text style={styles.actionBtnText}>✓ تم التسليم</Text>
-                  </TouchableOpacity>
-                )}
+                <TouchableOpacity
+                  style={[styles.actionBtn, { backgroundColor: COLORS.success }]}
+                  onPress={() => changeStatus(o, OrderStatus.DELIVERED)}
+                >
+                  <Text style={styles.actionBtnText}>✓ تم التسليم</Text>
+                </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.actionBtn, { backgroundColor: COLORS.danger + "15", marginRight: 8 }]}
                   onPress={() => changeStatus(o, OrderStatus.CANCELLED)}
@@ -159,7 +156,7 @@ export default function OrdersScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: COLORS.background },
+  safe: { flex: 1, backgroundColor: COLORS.background, overflow: "hidden" },
   filterBar: { backgroundColor: COLORS.card, maxHeight: 54, borderBottomWidth: 1, borderBottomColor: COLORS.border },
   filterContent: { alignItems: "center", paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
   filterChip: {
@@ -187,7 +184,6 @@ const styles = StyleSheet.create({
   customerRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   customerIcon: { fontSize: 14 },
   customerName: { fontSize: 15, fontWeight: "700", color: COLORS.textPrimary },
-  customerTypeLabel: { fontSize: 12, color: COLORS.textSecondary },
   total: { fontSize: 17, fontWeight: "bold", color: COLORS.primary },
   deliveryTotal: { fontSize: 12, color: COLORS.textSecondary, marginTop: 2 },
   date: { fontSize: 12, color: COLORS.textSecondary, marginBottom: 8 },

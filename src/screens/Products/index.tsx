@@ -8,6 +8,7 @@ import Card from "../../components/Card";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import EmptyState from "../../components/EmptyState";
 import { COLORS, CURRENCY } from "../../constants/theme";
+import BgLogo from "../../components/BgLogo";
 
 export default function ProductsScreen() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -84,6 +85,7 @@ export default function ProductsScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={["bottom"]}>
+      <BgLogo />
       <FlatList
         data={products}
         keyExtractor={(p) => String(p.id)}
@@ -165,7 +167,7 @@ function Input(props: any) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: COLORS.background },
+  safe: { flex: 1, backgroundColor: COLORS.background, overflow: "hidden" },
   list: { padding: 12, paddingBottom: 80 },
   row: { justifyContent: "space-between" },
   productCard: { flex: 0.48, margin: 4, padding: 12 },

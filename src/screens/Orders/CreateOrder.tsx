@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert, ScrollView, KeyboardAvoidingView, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { getCustomers, getProducts, getDrivers, createOrder } from "../../api";
-import { Customer, Product, Driver } from "../../types";
+import { getCustomers, getProducts, createOrder } from "../../api";
+import { Customer, Product } from "../../types";
 import { COLORS, CURRENCY } from "../../constants/theme";
 
 interface CartItem {
@@ -10,8 +10,7 @@ interface CartItem {
   productName: string;
   quantity: number;
   price: number;
-  deliveryFeePerTon: number;
-  totalDelivery: number;
+  naulonPerTon: number;
 }
 
 function Dropdown<T extends { id: number; name: string }>({
@@ -60,39 +59,36 @@ function Dropdown<T extends { id: number; name: string }>({
 }
 
 export default function CreateOrderScreen({ navigation }: any) {
-  const [customerType, setCustomerType] = useState<"COMPANY" | "DRIVER">("COMPANY");
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [drivers, setDrivers] = useState<Driver[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-  const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
-  const [deliveryDriver, setDeliveryDriver] = useState<Driver | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [naulonUncollected, setNaulonUncollected] = useState("0");
   const [qty, setQty] = useState("1");
   const [price, setPrice] = useState("");
-  const [deliveryFeePerTon, setDeliveryFeePerTon] = useState("0");
+  const [naulonPerTon, setNaulonPerTon] = useState("0");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    Promise.all([getCustomers(), getProducts(), getDrivers()])
-      .then(([c, p, d]) => {
+    Promise.all([getCustomers(), getProducts()])
+      .then(([c, p]) => {
         setCustomers(c);
         setProducts(p);
-        setDrivers(d);
       })
       .catch(console.error);
   }, []);
 
-  // When product changes, prefill price
   const handleSelectProduct = (p: Product) => {
     setSelectedProduct(p);
     setPrice(String(p.price));
   };
 
   const totalProductsAmount = cart.reduce((s, i) => s + i.quantity * i.price, 0);
-  const totalDeliveryAmount = cart.reduce((s, i) => s + i.totalDelivery, 0);
-  const total = totalProductsAmount - totalDeliveryAmount;
+  const autoNaulon = cart.reduce((s, i) => s + i.quantity * i.naulonPerTon, 0);
+  const naulos = parseFloat(naulonUncollected) || 0;
+  const isDriverCustomer = (selectedCustomer as any)?.type === 'driver';
+  const total = totalProductsAmount - autoNaulon;
 
   const addToCart = () => {
     if (!selectedProduct) {
@@ -108,39 +104,27 @@ export default function CreateOrderScreen({ navigation }: any) {
       Alert.alert("خطأ", `المخزون المتاح: ${selectedProduct.stock} فقط`);
       return;
     }
-    const unitPrice = parseFloat(price);
-    if (!unitPrice || unitPrice <= 0) {
+    const unitPrice = parseFloat(price) || 0;
+    if (!isDriverCustomer && unitPrice <= 0) {
       Alert.alert("خطأ", "أدخل سعراً صحيحاً");
       return;
     }
-    const fee = parseFloat(deliveryFeePerTon) || 0;
-    const itemTotalDelivery = q * fee;
 
+    const ntPerTon = parseFloat(naulonPerTon) || 0;
     setCart((prev) => {
       const existing = prev.find((i) => i.productId === selectedProduct.id);
-      if (existing) {
-        return prev.map((i) =>
-          i.productId === selectedProduct.id
-            ? { ...i, quantity: i.quantity + q, price: unitPrice, deliveryFeePerTon: fee, totalDelivery: (i.quantity + q) * fee }
-            : i,
-        );
-      }
-      return [
-        ...prev,
-        {
-          productId: selectedProduct.id,
-          productName: selectedProduct.name,
-          quantity: q,
-          price: unitPrice,
-          deliveryFeePerTon: fee,
-          totalDelivery: itemTotalDelivery,
-        },
-      ];
+      return existing
+        ? prev.map((i) =>
+            i.productId === selectedProduct.id
+              ? { ...i, quantity: i.quantity + q, price: unitPrice, naulonPerTon: ntPerTon }
+              : i,
+          )
+        : [...prev, { productId: selectedProduct.id, productName: selectedProduct.name, quantity: q, price: unitPrice, naulonPerTon: ntPerTon }];
     });
     setSelectedProduct(null);
     setQty("1");
     setPrice("");
-    setDeliveryFeePerTon("0");
+    setNaulonPerTon("0");
   };
 
   const submit = async () => {
@@ -152,20 +136,20 @@ export default function CreateOrderScreen({ navigation }: any) {
       Alert.alert("خطأ", "أضف منتجاً على الأقل");
       return;
     }
+    if (total < 0) {
+      Alert.alert("خطأ", "ناولون/طن أكبر من إجمالي المنتجات");
+      return;
+    }
     setSaving(true);
     try {
       await createOrder({
-        // customerType,
-        customerId: selectedCustomer?.id,
-        driverId: deliveryDriver?.id ?? null,
+        customerId: selectedCustomer.id,
         totalAmount: total,
-        totalDelivery: totalDeliveryAmount,
+        naulonUncollected: isDriverCustomer ? (naulos || undefined) : undefined,
         items: cart.map((i) => ({
           productId: i.productId,
           quantity: i.quantity,
           price: i.price,
-          deliveryFeePerTon: i.deliveryFeePerTon,
-          totalDelivery: i.totalDelivery,
         })),
       });
       navigation.goBack();
@@ -180,26 +164,6 @@ export default function CreateOrderScreen({ navigation }: any) {
     <SafeAreaView style={styles.safe} edges={["bottom"]}>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          {/* Customer Type Tabs */}
-          {/* <View style={styles.section}>
-            <Text style={styles.sectionTitle}>نوع العميل</Text>
-            <View style={styles.tabsContainer}>
-              <TouchableOpacity
-                style={[styles.tab, customerType === "COMPANY" && styles.activeTab]}
-                onPress={() => setCustomerType("COMPANY")}
-              >
-                <Text style={styles.tabEmoji}>🏢</Text>
-                <Text style={[styles.tabText, customerType === "COMPANY" && styles.activeTabText]}>شركة</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.tab, customerType === "DRIVER" && styles.activeTab]}
-                onPress={() => setCustomerType("DRIVER")}
-              >
-                <Text style={styles.tabEmoji}>🚛</Text>
-                <Text style={[styles.tabText, customerType === "DRIVER" && styles.activeTabText]}>سائق</Text>
-              </TouchableOpacity>
-            </View>
-          </View> */}
 
           {/* Customer Dropdown */}
           <View style={styles.section}>
@@ -209,26 +173,32 @@ export default function CreateOrderScreen({ navigation }: any) {
               items={customers}
               selected={selectedCustomer}
               onSelect={setSelectedCustomer}
-              renderSub={(c) => `المديونية: ${(c as any).totalDebt?.toLocaleString?.("ar-EG") ?? 0} ${CURRENCY}`}
+              renderSub={(c) => `${(c as any).type === 'driver' ? '🚗 سائق' : '👤 عميل'} | المديونية: ${(c as any).totalDebt?.toLocaleString?.("ar-EG") ?? 0} ${CURRENCY}`}
             />
           </View>
 
-          {/* Delivery Driver */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>سائق التوصيل (الناولون)</Text>
-            <Dropdown
-              label="-- بدون سائق --"
-              items={drivers}
-              selected={deliveryDriver}
-              onSelect={setDeliveryDriver}
-              renderSub={(d) => (d.vehiclePlate ? `🚗 ${d.vehiclePlate}` : d.phone ?? "")}
-            />
-            {deliveryDriver && (
-              <TouchableOpacity onPress={() => setDeliveryDriver(null)}>
-                <Text style={{ color: COLORS.danger, textAlign: "right", marginTop: 6, fontSize: 13 }}>✕ إلغاء تحديد السائق</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+          {/* Naulon Uncollected — only for drivers */}
+          {isDriverCustomer && (
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: COLORS.warning }]}>ناولون لم يتم تحصيله ({CURRENCY})</Text>
+              <View style={[styles.inputBox, { borderColor: COLORS.warning + "88" }]}>
+                <TextInput
+                  style={[styles.input, { color: COLORS.warning, fontWeight: "bold" }]}
+                  value={naulonUncollected}
+                  onChangeText={setNaulonUncollected}
+                  keyboardType="decimal-pad"
+                  textAlign="center"
+                  placeholder="0"
+                  placeholderTextColor={COLORS.textSecondary}
+                />
+              </View>
+              {naulos > 0 && (
+                <Text style={{ color: COLORS.warning, fontSize: 12, textAlign: "right", marginTop: 4 }}>
+                  يُحسب كرصيد للسائق (لا يُخصم من الطلب)
+                </Text>
+              )}
+            </View>
+          )}
 
           {/* Product Dropdown */}
           <View style={styles.section}>
@@ -278,13 +248,13 @@ export default function CreateOrderScreen({ navigation }: any) {
                 </View>
 
                 <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>ناولون / طن</Text>
-                  <View style={styles.inputBox}>
+                  <Text style={[styles.inputLabel, { color: COLORS.warning }]}>ناولون/طن ({CURRENCY})</Text>
+                  <View style={[styles.inputBox, { borderColor: COLORS.warning + "88" }]}>
                     <TextInput
-                      style={styles.input}
-                      value={deliveryFeePerTon}
-                      onChangeText={setDeliveryFeePerTon}
-                      keyboardType="numeric"
+                      style={[styles.input, { color: COLORS.warning }]}
+                      value={naulonPerTon}
+                      onChangeText={setNaulonPerTon}
+                      keyboardType="decimal-pad"
                       textAlign="center"
                       placeholder="0"
                       placeholderTextColor={COLORS.textSecondary}
@@ -293,13 +263,11 @@ export default function CreateOrderScreen({ navigation }: any) {
                 </View>
               </View>
 
-              {/* Live preview */}
               {parseFloat(price) > 0 && parseInt(qty) > 0 && (
                 <View style={styles.previewRow}>
-                  <Text style={styles.previewLabel}>إجمالي:</Text>
+                  <Text style={styles.previewLabel}>إجمالي الصنف:</Text>
                   <Text style={styles.previewValue}>
-                    {((parseFloat(price) || 0) * (parseInt(qty) || 0) - (parseFloat(deliveryFeePerTon) || 0) * (parseInt(qty) || 0)).toLocaleString("ar-EG")}{" "}
-                    {CURRENCY}
+                    {((parseFloat(price) || 0) * (parseInt(qty) || 0)).toLocaleString("ar-EG")} {CURRENCY}
                   </Text>
                 </View>
               )}
@@ -317,7 +285,9 @@ export default function CreateOrderScreen({ navigation }: any) {
               {cart.map((item) => (
                 <View key={item.productId} style={styles.cartCard}>
                   <View style={styles.cartCardHeader}>
-                    <TouchableOpacity style={styles.removeBtn} onPress={() => setCart((prev) => prev.filter((i) => i.productId !== item.productId))}>
+                    <TouchableOpacity style={styles.removeBtn} onPress={() => {
+                      setCart(cart.filter((i) => i.productId !== item.productId));
+                    }}>
                       <Text style={styles.removeBtnText}>✕</Text>
                     </TouchableOpacity>
                     <Text style={styles.cartItemName}>{item.productName}</Text>
@@ -329,26 +299,20 @@ export default function CreateOrderScreen({ navigation }: any) {
                     </View>
                     <View style={styles.cartDetailDivider} />
                     <View style={styles.cartDetailRow}>
-                      <Text style={styles.cartDetailValue}>
-                        {item.price} {CURRENCY}
-                      </Text>
+                      <Text style={styles.cartDetailValue}>{item.price} {CURRENCY}</Text>
                       <Text style={styles.cartDetailLabel}>السعر</Text>
                     </View>
-                    {item.deliveryFeePerTon > 0 && (
-                      <>
-                        <View style={styles.cartDetailDivider} />
-                        <View style={styles.cartDetailRow}>
-                          <Text style={styles.cartDetailValue}>
-                            {item.deliveryFeePerTon} {CURRENCY}
-                          </Text>
-                          <Text style={styles.cartDetailLabel}>ناولون/طن</Text>
-                        </View>
-                      </>
-                    )}
+                    {item.naulonPerTon > 0 && <>
+                      <View style={styles.cartDetailDivider} />
+                      <View style={styles.cartDetailRow}>
+                        <Text style={[styles.cartDetailValue, { color: COLORS.warning }]}>{item.naulonPerTon} {CURRENCY}</Text>
+                        <Text style={styles.cartDetailLabel}>ناولون/طن</Text>
+                      </View>
+                    </>}
                     <View style={styles.cartDetailDivider} />
                     <View style={styles.cartDetailRow}>
                       <Text style={[styles.cartDetailValue, { color: COLORS.primary, fontWeight: "bold" }]}>
-                        {(item.quantity * item.price - item.totalDelivery).toLocaleString("ar-EG")} {CURRENCY}
+                        {(item.quantity * item.price).toLocaleString("ar-EG")} {CURRENCY}
                       </Text>
                       <Text style={styles.cartDetailLabel}>الإجمالي</Text>
                     </View>
@@ -364,12 +328,12 @@ export default function CreateOrderScreen({ navigation }: any) {
                   </Text>
                   <Text style={styles.totalSubLabel}>إجمالي المنتجات</Text>
                 </View>
-                {totalDeliveryAmount > 0 && (
+                {autoNaulon > 0 && (
                   <View style={styles.totalRow}>
-                    <Text style={styles.totalSubValue}>
-                      - {totalDeliveryAmount.toLocaleString("ar-EG")} {CURRENCY}
+                    <Text style={[styles.totalSubValue, { color: COLORS.warning }]}>
+                      - {autoNaulon.toLocaleString("ar-EG")} {CURRENCY}
                     </Text>
-                    <Text style={styles.totalSubLabel}>الناولون (خصم)</Text>
+                    <Text style={styles.totalSubLabel}>ناولون/طن</Text>
                   </View>
                 )}
                 <View style={styles.totalDivider} />
@@ -377,8 +341,16 @@ export default function CreateOrderScreen({ navigation }: any) {
                   <Text style={styles.totalFinalValue}>
                     {total.toLocaleString("ar-EG")} {CURRENCY}
                   </Text>
-                  <Text style={styles.totalFinalLabel}>الإجمالي الكلي</Text>
+                  <Text style={styles.totalFinalLabel}>صافي الطلب</Text>
                 </View>
+                {isDriverCustomer && naulos > 0 && (
+                  <View style={styles.totalRow}>
+                    <Text style={[styles.totalSubValue, { color: "#4ade80" }]}>
+                      + {naulos.toLocaleString("ar-EG")} {CURRENCY}
+                    </Text>
+                    <Text style={[styles.totalSubLabel, { color: "rgba(255,255,255,0.6)" }]}>ناولون للسائق</Text>
+                  </View>
+                )}
               </View>
             </View>
           )}
@@ -446,30 +418,11 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
 
-  // Customer type tabs
-  tabsContainer: {
-    flexDirection: "row",
-    backgroundColor: COLORS.card,
-    borderRadius: 12,
-    padding: 4,
-    gap: 4,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  tab: { flex: 1, paddingVertical: 10, alignItems: "center", borderRadius: 8, flexDirection: "column", gap: 2 },
-  activeTab: {
-    backgroundColor: COLORS.primary,
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  tabEmoji: { fontSize: 20 },
-  tabText: { fontSize: 13, fontWeight: "600", color: COLORS.textSecondary },
-  activeTabText: { color: "#fff" },
+  inputBox: { backgroundColor: COLORS.background, borderRadius: 8, borderWidth: 1, borderColor: COLORS.border },
+  inputBoxHighlight: { borderColor: COLORS.primary, borderWidth: 1.5 },
+  input: { padding: 10, fontSize: 15, color: COLORS.textPrimary, fontWeight: "600" },
+  inputHighlighted: { color: COLORS.primary },
 
-  // Item form card
   itemFormCard: {
     backgroundColor: COLORS.card,
     borderRadius: 14,
@@ -488,10 +441,6 @@ const styles = StyleSheet.create({
   inputsGrid: { flexDirection: "row", gap: 8, marginBottom: 10 },
   inputGroup: { flex: 1 },
   inputLabel: { fontSize: 11, color: COLORS.textSecondary, marginBottom: 5, textAlign: "center", fontWeight: "600" },
-  inputBox: { backgroundColor: COLORS.background, borderRadius: 8, borderWidth: 1, borderColor: COLORS.border },
-  inputBoxHighlight: { borderColor: COLORS.primary, borderWidth: 1.5 },
-  input: { padding: 10, fontSize: 15, color: COLORS.textPrimary, fontWeight: "600" },
-  inputHighlighted: { color: COLORS.primary },
 
   previewRow: {
     flexDirection: "row",
@@ -518,7 +467,6 @@ const styles = StyleSheet.create({
   },
   addBtnText: { color: "#fff", fontWeight: "bold", fontSize: 14 },
 
-  // Cart
   cartCard: {
     backgroundColor: COLORS.card,
     borderRadius: 12,
@@ -545,13 +493,11 @@ const styles = StyleSheet.create({
   cartDetailValue: { fontSize: 13, color: COLORS.textPrimary, fontWeight: "600" },
   cartDetailDivider: { width: 1, backgroundColor: COLORS.border, marginVertical: 8 },
 
-  // Totals
   totalCard: {
     backgroundColor: COLORS.primaryDark,
     borderRadius: 14,
     padding: 16,
     marginBottom: 16,
-    borderWidth: 0,
   },
   totalRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
   totalSubLabel: { color: "rgba(255,255,255,0.75)", fontSize: 13 },
@@ -560,7 +506,6 @@ const styles = StyleSheet.create({
   totalFinalLabel: { color: "#fff", fontSize: 16, fontWeight: "700" },
   totalFinalValue: { color: "#fff", fontSize: 20, fontWeight: "bold" },
 
-  // Submit
   submitBtn: {
     backgroundColor: COLORS.primary,
     borderRadius: 14,

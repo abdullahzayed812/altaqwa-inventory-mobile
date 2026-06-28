@@ -8,6 +8,7 @@ import Card from '../../components/Card';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import EmptyState from '../../components/EmptyState';
 import { COLORS, CURRENCY } from '../../constants/theme';
+import BgLogo from '../../components/BgLogo';
 
 export default function PurchasesScreen() {
   const [purchases, setPurchases] = useState<Purchase[]>([]);
@@ -29,6 +30,7 @@ export default function PurchasesScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <BgLogo />
       <FlatList
         data={purchases}
         keyExtractor={p => String(p.id)}
@@ -54,7 +56,7 @@ export default function PurchasesScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: COLORS.background },
+  safe: { flex: 1, backgroundColor: COLORS.background, overflow: 'hidden' },
   list: { padding: 16, paddingBottom: 24 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   date: { fontSize: 12, color: COLORS.textSecondary },

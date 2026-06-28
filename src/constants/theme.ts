@@ -19,14 +19,12 @@ export const CURRENCY = 'ج.م';
 
 export const ORDER_STATUS_LABELS: Record<string, string> = {
   PENDING: 'قيد الانتظار',
-  ASSIGNED: 'قيد التوصيل',
   DELIVERED: 'تم التسليم',
   CANCELLED: 'ملغي',
 };
 
 export const ORDER_STATUS_COLORS: Record<string, string> = {
   PENDING: '#FF9800',
-  ASSIGNED: '#2196F3',
   DELIVERED: '#4CAF50',
   CANCELLED: '#9E9E9E',
 };

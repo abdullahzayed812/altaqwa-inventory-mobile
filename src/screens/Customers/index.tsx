@@ -8,6 +8,7 @@ import Card from "../../components/Card";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import EmptyState from "../../components/EmptyState";
 import { COLORS, CURRENCY } from "../../constants/theme";
+import BgLogo from "../../components/BgLogo";
 
 function Avatar({ name, size = 44 }: { name: string; size?: number }) {
   const initial = name.trim()[0] ?? "?";
@@ -57,6 +58,7 @@ export default function CustomersScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.safe} edges={["bottom"]}>
+      <BgLogo />
       <View style={styles.searchBar}>
         <Text style={styles.searchIcon}>🔍</Text>
         <TextInput
@@ -116,7 +118,7 @@ export default function CustomersScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: COLORS.background },
+  safe: { flex: 1, backgroundColor: COLORS.background, overflow: "hidden" },
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
