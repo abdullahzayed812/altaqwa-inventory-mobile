@@ -40,8 +40,8 @@ export default function ProductsScreen() {
     if (product) {
       setEditingProduct(product);
       setName(product.name);
-      setPrice(product.price.toString());
-      setStock(product.stock.toString());
+      setPrice(product.price !== null ? product.price.toString() : "");
+      setStock(product.stock !== null ? product.stock.toString() : "");
     } else {
       setEditingProduct(null);
       setName("");
@@ -52,16 +52,20 @@ export default function ProductsScreen() {
   };
 
   const save = async () => {
-    if (!name.trim() || !price || !stock) {
-      Alert.alert("خطأ", "جميع الحقول مطلوبة");
+    if (!name.trim()) {
+      Alert.alert("خطأ", "اسم المنتج مطلوب");
       return;
     }
-    const p = parseFloat(price);
-    const s = parseInt(stock);
-    if (isNaN(p) || isNaN(s)) {
-      Alert.alert("خطأ", "سعر ومخزون غير صالحين");
-      return;
-    }
+    const p = price.trim() ? parseFloat(price) : null;
+    const s = stock.trim() ? parseInt(stock) : null;
+    // if (p !== null && isNaN(p)) {
+    //   Alert.alert("خطأ", "سعر غير صالح");
+    //   return;
+    // }
+    // if (s !== null && isNaN(s)) {
+    //   Alert.alert("خطأ", "مخزون غير صالح");
+    //   return;
+    // }
     setSaving(true);
     try {
       if (editingProduct) {
@@ -94,17 +98,17 @@ export default function ProductsScreen() {
         columnWrapperStyle={styles.row}
         ListEmptyComponent={<EmptyState icon="🌾" message="لا توجد منتجات" />}
         renderItem={({ item: p }) => (
-          <Card style={[styles.productCard, p.stock < 10 && styles.lowStockCard]}>
-            {p.stock < 10 && <Text style={styles.lowStockBadge}>مخزون منخفض ⚠️</Text>}
+          <Card style={[styles.productCard, p.stock !== null && p.stock < 10 && styles.lowStockCard]}>
+            {p.stock !== null && p.stock < 10 && <Text style={styles.lowStockBadge}>مخزون منخفض ⚠️</Text>}
             <Text style={styles.productName} numberOfLines={2}>
               {p.name}
             </Text>
             <Text style={styles.productPrice}>
-              {p.price.toLocaleString("ar-EG")} {CURRENCY}
+              {p.price !== null ? p.price.toLocaleString("ar-EG") : "-"} {CURRENCY}
             </Text>
             <View style={styles.cardFooter}>
-              <View style={[styles.stockBadge, p.stock < 10 && { backgroundColor: COLORS.warning }]}>
-                <Text style={styles.stockText}>{p.stock} وحدة</Text>
+              <View style={[styles.stockBadge, p.stock !== null && p.stock < 10 && { backgroundColor: COLORS.warning }]}>
+                <Text style={styles.stockText}>{p.stock ?? "-"} وحدة</Text>
               </View>
               <TouchableOpacity style={styles.editBtn} onPress={() => openModal(p)}>
                 <Text style={styles.editBtnText}>تعديل</Text>

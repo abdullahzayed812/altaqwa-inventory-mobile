@@ -81,13 +81,13 @@ export default function CreateOrderScreen({ navigation }: any) {
 
   const handleSelectProduct = (p: Product) => {
     setSelectedProduct(p);
-    setPrice(String(p.price));
+    setPrice(String(p.price ?? "0"));
   };
 
   const totalProductsAmount = cart.reduce((s, i) => s + i.quantity * i.price, 0);
   const autoNaulon = cart.reduce((s, i) => s + i.quantity * i.naulonPerTon, 0);
   const naulos = parseFloat(naulonUncollected) || 0;
-  const isDriverCustomer = (selectedCustomer as any)?.type === 'driver';
+  const isDriverCustomer = (selectedCustomer as any)?.type === "driver";
   const total = totalProductsAmount - autoNaulon;
 
   const addToCart = () => {
@@ -100,25 +100,14 @@ export default function CreateOrderScreen({ navigation }: any) {
       Alert.alert("خطأ", "أدخل كمية صحيحة");
       return;
     }
-    if (q > selectedProduct.stock) {
-      Alert.alert("خطأ", `المخزون المتاح: ${selectedProduct.stock} فقط`);
-      return;
-    }
-    const unitPrice = parseFloat(price) || 0;
-    if (!isDriverCustomer && unitPrice <= 0) {
-      Alert.alert("خطأ", "أدخل سعراً صحيحاً");
-      return;
-    }
 
+    const unitPrice = parseFloat(price) || 0;
     const ntPerTon = parseFloat(naulonPerTon) || 0;
+
     setCart((prev) => {
       const existing = prev.find((i) => i.productId === selectedProduct.id);
       return existing
-        ? prev.map((i) =>
-            i.productId === selectedProduct.id
-              ? { ...i, quantity: i.quantity + q, price: unitPrice, naulonPerTon: ntPerTon }
-              : i,
-          )
+        ? prev.map((i) => (i.productId === selectedProduct.id ? { ...i, quantity: i.quantity + q, price: unitPrice, naulonPerTon: ntPerTon } : i))
         : [...prev, { productId: selectedProduct.id, productName: selectedProduct.name, quantity: q, price: unitPrice, naulonPerTon: ntPerTon }];
     });
     setSelectedProduct(null);
@@ -145,7 +134,7 @@ export default function CreateOrderScreen({ navigation }: any) {
       await createOrder({
         customerId: selectedCustomer.id,
         totalAmount: total,
-        naulonUncollected: isDriverCustomer ? (naulos || undefined) : undefined,
+        naulonUncollected: isDriverCustomer ? naulos || undefined : undefined,
         items: cart.map((i) => ({
           productId: i.productId,
           quantity: i.quantity,
@@ -164,7 +153,6 @@ export default function CreateOrderScreen({ navigation }: any) {
     <SafeAreaView style={styles.safe} edges={["bottom"]}>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-
           {/* Customer Dropdown */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>العميل *</Text>
@@ -173,7 +161,9 @@ export default function CreateOrderScreen({ navigation }: any) {
               items={customers}
               selected={selectedCustomer}
               onSelect={setSelectedCustomer}
-              renderSub={(c) => `${(c as any).type === 'driver' ? '🚗 سائق' : '👤 عميل'} | المديونية: ${(c as any).totalDebt?.toLocaleString?.("ar-EG") ?? 0} ${CURRENCY}`}
+              renderSub={(c) =>
+                `${(c as any).type === "driver" ? "🚗 سائق" : "👤 عميل"} | المديونية: ${(c as any).totalDebt?.toLocaleString?.("ar-EG") ?? 0} ${CURRENCY}`
+              }
             />
           </View>
 
@@ -193,9 +183,7 @@ export default function CreateOrderScreen({ navigation }: any) {
                 />
               </View>
               {naulos > 0 && (
-                <Text style={{ color: COLORS.warning, fontSize: 12, textAlign: "right", marginTop: 4 }}>
-                  يُحسب كرصيد للسائق (لا يُخصم من الطلب)
-                </Text>
+                <Text style={{ color: COLORS.warning, fontSize: 12, textAlign: "right", marginTop: 4 }}>يُحسب كرصيد للسائق (لا يُخصم من الطلب)</Text>
               )}
             </View>
           )}
@@ -205,10 +193,10 @@ export default function CreateOrderScreen({ navigation }: any) {
             <Text style={styles.sectionTitle}>المنتج</Text>
             <Dropdown
               label="-- اختر منتجاً --"
-              items={products.filter((p) => p.stock > 0)}
+              items={products}
               selected={selectedProduct}
               onSelect={handleSelectProduct}
-              renderSub={(p) => `السعر: ${p.price} ${CURRENCY} | المخزون: ${p.stock} وحدة`}
+              renderSub={(p) => `السعر: ${p.price ?? "0"} ${CURRENCY} | المخزون: ${p.stock ?? "0"} وحدة`}
             />
           </View>
 
@@ -264,11 +252,30 @@ export default function CreateOrderScreen({ navigation }: any) {
               </View>
 
               {parseFloat(price) > 0 && parseInt(qty) > 0 && (
-                <View style={styles.previewRow}>
-                  <Text style={styles.previewLabel}>إجمالي الصنف:</Text>
-                  <Text style={styles.previewValue}>
-                    {((parseFloat(price) || 0) * (parseInt(qty) || 0)).toLocaleString("ar-EG")} {CURRENCY}
-                  </Text>
+                <View style={styles.previewCard}>
+                  <View style={styles.previewRow}>
+                    <Text style={styles.previewLabel}>إجمالي الصنف:</Text>
+                    <Text style={styles.previewValue}>
+                      {((parseFloat(price) || 0) * (parseInt(qty) || 0)).toLocaleString("ar-EG")} {CURRENCY}
+                    </Text>
+                  </View>
+                  {parseFloat(naulonPerTon) > 0 && (
+                    <>
+                      <View style={styles.previewRow}>
+                        <Text style={[styles.previewLabel, { color: COLORS.warning }]}>ناولون:</Text>
+                        <Text style={[styles.previewValue, { color: COLORS.warning }]}>
+                          - {((parseFloat(naulonPerTon) || 0) * (parseInt(qty) || 0)).toLocaleString("ar-EG")} {CURRENCY}
+                        </Text>
+                      </View>
+                      <View style={styles.previewDivider} />
+                      <View style={styles.previewRow}>
+                        <Text style={[styles.previewLabel, { color: COLORS.primary, fontWeight: "bold" }]}>صافي الصنف:</Text>
+                        <Text style={[styles.previewValue, { fontSize: 16 }]}>
+                          {(((parseFloat(price) || 0) - (parseFloat(naulonPerTon) || 0)) * (parseInt(qty) || 0)).toLocaleString("ar-EG")} {CURRENCY}
+                        </Text>
+                      </View>
+                    </>
+                  )}
                 </View>
               )}
 
@@ -285,9 +292,12 @@ export default function CreateOrderScreen({ navigation }: any) {
               {cart.map((item) => (
                 <View key={item.productId} style={styles.cartCard}>
                   <View style={styles.cartCardHeader}>
-                    <TouchableOpacity style={styles.removeBtn} onPress={() => {
-                      setCart(cart.filter((i) => i.productId !== item.productId));
-                    }}>
+                    <TouchableOpacity
+                      style={styles.removeBtn}
+                      onPress={() => {
+                        setCart(cart.filter((i) => i.productId !== item.productId));
+                      }}
+                    >
                       <Text style={styles.removeBtnText}>✕</Text>
                     </TouchableOpacity>
                     <Text style={styles.cartItemName}>{item.productName}</Text>
@@ -299,16 +309,22 @@ export default function CreateOrderScreen({ navigation }: any) {
                     </View>
                     <View style={styles.cartDetailDivider} />
                     <View style={styles.cartDetailRow}>
-                      <Text style={styles.cartDetailValue}>{item.price} {CURRENCY}</Text>
+                      <Text style={styles.cartDetailValue}>
+                        {item.price} {CURRENCY}
+                      </Text>
                       <Text style={styles.cartDetailLabel}>السعر</Text>
                     </View>
-                    {item.naulonPerTon > 0 && <>
-                      <View style={styles.cartDetailDivider} />
-                      <View style={styles.cartDetailRow}>
-                        <Text style={[styles.cartDetailValue, { color: COLORS.warning }]}>{item.naulonPerTon} {CURRENCY}</Text>
-                        <Text style={styles.cartDetailLabel}>ناولون/طن</Text>
-                      </View>
-                    </>}
+                    {item.naulonPerTon > 0 && (
+                      <>
+                        <View style={styles.cartDetailDivider} />
+                        <View style={styles.cartDetailRow}>
+                          <Text style={[styles.cartDetailValue, { color: COLORS.warning }]}>
+                            {item.naulonPerTon} {CURRENCY}
+                          </Text>
+                          <Text style={styles.cartDetailLabel}>ناولون/طن</Text>
+                        </View>
+                      </>
+                    )}
                     <View style={styles.cartDetailDivider} />
                     <View style={styles.cartDetailRow}>
                       <Text style={[styles.cartDetailValue, { color: COLORS.primary, fontWeight: "bold" }]}>
@@ -442,15 +458,20 @@ const styles = StyleSheet.create({
   inputGroup: { flex: 1 },
   inputLabel: { fontSize: 11, color: COLORS.textSecondary, marginBottom: 5, textAlign: "center", fontWeight: "600" },
 
+  previewCard: {
+    backgroundColor: COLORS.primary + "14",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 10,
+    gap: 6,
+  },
   previewRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: COLORS.primary + "14",
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 10,
   },
+  previewDivider: { height: 1, backgroundColor: COLORS.primary + "30" },
   previewLabel: { fontSize: 13, color: COLORS.primary, fontWeight: "600" },
   previewValue: { fontSize: 15, color: COLORS.primary, fontWeight: "bold" },
 
