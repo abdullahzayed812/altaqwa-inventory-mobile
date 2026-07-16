@@ -73,7 +73,7 @@ export default function CreateOrderScreen({ navigation }: any) {
   useEffect(() => {
     Promise.all([getCustomers(), getProducts()])
       .then(([c, p]) => {
-        setCustomers(c);
+        setCustomers(c.filter((cust: any) => cust.type !== "financial"));
         setProducts(p);
       })
       .catch(console.error);

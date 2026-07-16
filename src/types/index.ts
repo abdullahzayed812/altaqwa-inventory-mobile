@@ -7,6 +7,7 @@ export enum OrderStatus {
 export enum CustomerType {
   CUSTOMER = 'customer',
   DRIVER = 'driver',
+  FINANCIAL = 'financial',
 }
 
 export enum PaymentMethod {

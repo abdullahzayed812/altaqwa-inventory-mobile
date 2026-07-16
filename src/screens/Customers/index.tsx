@@ -87,6 +87,11 @@ export default function CustomersScreen({ navigation }: any) {
               <View style={styles.info}>
                 <Text style={styles.name}>{c.name}</Text>
                 {c.phone && <Text style={styles.sub}>{c.phone}</Text>}
+                {c.type !== "customer" && (
+                  <Text style={[styles.typeBadge, c.type === "financial" && { color: COLORS.info }]}>
+                    {c.type === "driver" ? "سائق" : "حساب مالي"}
+                  </Text>
+                )}
               </View>
               <View style={styles.debtBox}>
                 {c.totalDebt < 0 ? (
@@ -137,6 +142,7 @@ const styles = StyleSheet.create({
   info: { flex: 1 },
   name: { fontSize: 15, fontWeight: "700", color: COLORS.textPrimary },
   sub: { fontSize: 13, color: COLORS.textSecondary, marginTop: 2, textAlign: "right" },
+  typeBadge: { fontSize: 11, fontWeight: "700", color: COLORS.warning, marginTop: 2, textAlign: "right" },
   debtBox: { alignItems: "flex-end" },
   debtBadge: { backgroundColor: COLORS.debtRed + "12", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, alignItems: "center" },
   debtValue: { fontSize: 14, fontWeight: "bold", color: COLORS.debtRed },

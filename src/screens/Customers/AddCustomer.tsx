@@ -7,7 +7,7 @@ import { COLORS } from "../../constants/theme";
 type BalanceType = "مدين" | "دائن";
 
 export default function AddCustomerScreen({ navigation }: any) {
-  const [type, setType] = useState<"customer" | "driver">("customer");
+  const [type, setType] = useState<"customer" | "driver" | "financial">("customer");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
@@ -65,6 +65,12 @@ export default function AddCustomerScreen({ navigation }: any) {
               onPress={() => setType("driver")}
             >
               <Text style={[styles.toggleText, type === "driver" && styles.toggleTextActive]}>سائق</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.toggleBtn, type === "financial" && { backgroundColor: COLORS.info, borderColor: COLORS.info }]}
+              onPress={() => setType("financial")}
+            >
+              <Text style={[styles.toggleText, type === "financial" && styles.toggleTextActive]}>حساب مالي</Text>
             </TouchableOpacity>
           </View>
 

@@ -283,14 +283,16 @@ export default function CustomerDetailsScreen({ route, navigation }: any) {
               المدفوعات {payments.length > 0 ? `(${payments.length})` : ""}
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.tab, activeTab === "orders" && styles.tabActive]} onPress={() => setActiveTab("orders")}>
-            <Text style={[styles.tabText, activeTab === "orders" && styles.tabTextActive]}>الطلبات {orders.length > 0 ? `(${orders.length})` : ""}</Text>
-          </TouchableOpacity>
+          {customer.type !== "financial" && (
+            <TouchableOpacity style={[styles.tab, activeTab === "orders" && styles.tabActive]} onPress={() => setActiveTab("orders")}>
+              <Text style={[styles.tabText, activeTab === "orders" && styles.tabTextActive]}>الطلبات {orders.length > 0 ? `(${orders.length})` : ""}</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {loading ? (
           <ActivityIndicator color={COLORS.primary} style={{ marginTop: 32 }} />
-        ) : activeTab === "payments" ? (
+        ) : activeTab === "payments" || customer.type === "financial" ? (
           <>
             <TextInput
               style={styles.searchInput}
