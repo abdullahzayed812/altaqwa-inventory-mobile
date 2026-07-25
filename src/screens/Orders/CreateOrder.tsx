@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert, ScrollView, KeyboardAvoidingView, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { getCustomers, getProducts, createOrder } from "../../api";
-import { Customer, Product } from "../../types";
+import { getCustomers, getProducts, createOrder, updateOrder } from "../../api";
+import { Customer, Product, Order } from "../../types";
 import { COLORS, CURRENCY } from "../../constants/theme";
 
 interface CartItem {
@@ -58,7 +58,8 @@ function Dropdown<T extends { id: number; name: string }>({
   );
 }
 
-export default function CreateOrderScreen({ navigation }: any) {
+export default function CreateOrderScreen({ navigation, route }: any) {
+  const editingOrder: Order | undefined = route?.params?.order;
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -75,6 +76,19 @@ export default function CreateOrderScreen({ navigation }: any) {
       .then(([c, p]) => {
         setCustomers(c.filter((cust: any) => cust.type !== "financial"));
         setProducts(p);
+        if (editingOrder) {
+          setSelectedCustomer(c.find((cust: any) => cust.id === editingOrder.customerId) || null);
+          setCart(
+            (editingOrder.items ?? []).map((i: any) => ({
+              productId: i.productId,
+              productName: i.product?.name ?? "",
+              quantity: i.quantity,
+              price: i.price,
+              naulonPerTon: i.deliveryFeePerTon || 0,
+            }))
+          );
+          setNaulonUncollected(String(editingOrder.naulonUncollected || 0));
+        }
       })
       .catch(console.error);
   }, []);
@@ -131,7 +145,7 @@ export default function CreateOrderScreen({ navigation }: any) {
     }
     setSaving(true);
     try {
-      await createOrder({
+      const payload = {
         customerId: selectedCustomer.id,
         totalAmount: total,
         naulonUncollected: isDriverCustomer ? naulos || undefined : undefined,
@@ -139,8 +153,15 @@ export default function CreateOrderScreen({ navigation }: any) {
           productId: i.productId,
           quantity: i.quantity,
           price: i.price,
+          deliveryFeePerTon: i.naulonPerTon || undefined,
+          totalDelivery: i.naulonPerTon ? i.quantity * i.naulonPerTon : undefined,
         })),
-      });
+      };
+      if (editingOrder) {
+        await updateOrder(editingOrder.id, payload);
+      } else {
+        await createOrder(payload);
+      }
       navigation.goBack();
     } catch (e: any) {
       Alert.alert("خطأ", e.message);
@@ -376,7 +397,9 @@ export default function CreateOrderScreen({ navigation }: any) {
             onPress={submit}
             disabled={saving || cart.length === 0 || !selectedCustomer}
           >
-            <Text style={styles.submitBtnText}>{saving ? "جاري الحفظ..." : `✅ تأكيد الطلب  •  ${total.toLocaleString("ar-EG")} ${CURRENCY}`}</Text>
+            <Text style={styles.submitBtnText}>
+              {saving ? "جاري الحفظ..." : `✅ ${editingOrder ? "حفظ التعديلات" : "تأكيد الطلب"}  •  ${total.toLocaleString("ar-EG")} ${CURRENCY}`}
+            </Text>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>

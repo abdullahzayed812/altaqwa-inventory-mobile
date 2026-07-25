@@ -64,6 +64,16 @@ export const createOrder = (data: {
 export const updateOrderStatus = (id: number, status: OrderStatus) =>
   client.patch<Order>(`/orders/${id}/status`, { status }).then(r => r.data);
 
+export const updateOrder = (id: number, data: {
+  customerId: number;
+  totalAmount: number;
+  naulonUncollected?: number;
+  items: { productId: number; quantity: number; price: number; deliveryFeePerTon?: number; totalDelivery?: number }[];
+}) => client.put<Order>(`/orders/${id}`, data).then(r => r.data);
+
+export const deleteOrder = (id: number) =>
+  client.delete(`/orders/${id}`).then(() => undefined);
+
 // ─── Payments ─────────────────────────────────────────────────────────────────
 
 export const getPayments = () =>

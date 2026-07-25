@@ -65,7 +65,11 @@ function OrdersStack() {
   return (
     <Stack.Navigator screenOptions={stackOptions}>
       <Stack.Screen name="OrdersList" component={OrdersScreen} options={{ title: "الطلبات" }} />
-      <Stack.Screen name="CreateOrder" component={CreateOrderScreen} options={{ title: "طلب جديد" }} />
+      <Stack.Screen
+        name="CreateOrder"
+        component={CreateOrderScreen}
+        options={({ route }: any) => ({ title: route.params?.order ? "تعديل الطلب" : "طلب جديد" })}
+      />
     </Stack.Navigator>
   );
 }

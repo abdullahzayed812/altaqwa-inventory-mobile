@@ -2,7 +2,7 @@ import React, { useCallback, useState } from "react";
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
-import { getOrders, updateOrderStatus } from "../../api";
+import { getOrders, updateOrderStatus, deleteOrder } from "../../api";
 import { Order, OrderStatus } from "../../types";
 import Card from "../../components/Card";
 import LoadingSpinner from "../../components/LoadingSpinner";
@@ -44,6 +44,24 @@ export default function OrdersScreen({ navigation }: any) {
         onPress: async () => {
           try {
             await updateOrderStatus(order.id, status);
+            load();
+          } catch (e: any) {
+            Alert.alert("خطأ", e.message);
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleDelete = (order: Order) => {
+    Alert.alert("تأكيد الحذف", `هل أنت متأكد من حذف الطلب #${order.orderNumber}؟ لا يمكن التراجع عن هذا الإجراء.`, [
+      { text: "إلغاء", style: "cancel" },
+      {
+        text: "حذف",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await deleteOrder(order.id);
             load();
           } catch (e: any) {
             Alert.alert("خطأ", e.message);
@@ -128,22 +146,36 @@ export default function OrdersScreen({ navigation }: any) {
             )}
 
             {/* Actions */}
-            {o.status === OrderStatus.PENDING && (
-              <View style={styles.actions}>
-                <TouchableOpacity
-                  style={[styles.actionBtn, { backgroundColor: COLORS.success }]}
-                  onPress={() => changeStatus(o, OrderStatus.DELIVERED)}
-                >
-                  <Text style={styles.actionBtnText}>✓ تم التسليم</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.actionBtn, { backgroundColor: COLORS.danger + "15", marginRight: 8 }]}
-                  onPress={() => changeStatus(o, OrderStatus.CANCELLED)}
-                >
-                  <Text style={[styles.actionBtnText, { color: COLORS.danger }]}>إلغاء</Text>
-                </TouchableOpacity>
-              </View>
-            )}
+            <View style={styles.actions}>
+              {o.status === OrderStatus.PENDING && (
+                <>
+                  <TouchableOpacity
+                    style={[styles.actionBtn, { backgroundColor: COLORS.success }]}
+                    onPress={() => changeStatus(o, OrderStatus.DELIVERED)}
+                  >
+                    <Text style={styles.actionBtnText}>✓ تم التسليم</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.actionBtn, { backgroundColor: COLORS.danger + "15", marginRight: 8 }]}
+                    onPress={() => changeStatus(o, OrderStatus.CANCELLED)}
+                  >
+                    <Text style={[styles.actionBtnText, { color: COLORS.danger }]}>إلغاء</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+              <TouchableOpacity
+                style={[styles.actionBtn, { backgroundColor: COLORS.textSecondary + "15", marginRight: 8 }]}
+                onPress={() => navigation.navigate("CreateOrder", { order: o })}
+              >
+                <Text style={[styles.actionBtnText, { color: COLORS.textSecondary }]}>✎ تعديل</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionBtn, { backgroundColor: COLORS.danger + "15", marginRight: 8 }]}
+                onPress={() => handleDelete(o)}
+              >
+                <Text style={[styles.actionBtnText, { color: COLORS.danger }]}>🗑 حذف</Text>
+              </TouchableOpacity>
+            </View>
           </Card>
         )}
       />
@@ -188,7 +220,7 @@ const styles = StyleSheet.create({
   deliveryTotal: { fontSize: 12, color: COLORS.textSecondary, marginTop: 2 },
   date: { fontSize: 12, color: COLORS.textSecondary, marginBottom: 8 },
   itemLine: { fontSize: 13, color: COLORS.textSecondary, marginBottom: 2 },
-  actions: { flexDirection: "row", marginTop: 12, justifyContent: "flex-end" },
+  actions: { flexDirection: "row", flexWrap: "wrap", marginTop: 12, justifyContent: "flex-end", rowGap: 8 },
   actionBtn: { borderRadius: 8, paddingHorizontal: 16, paddingVertical: 8 },
   actionBtnText: { color: "#fff", fontWeight: "bold", fontSize: 13 },
   fab: {
